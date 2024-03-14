@@ -25,6 +25,11 @@ import datasets
 import networks
 from IPython import embed
 
+# from datasets import SCAREDRAWDataset
+
+from datasets import LungRAWDataset
+
+import wandb_logging
 
 class Trainer:
     def __init__(self, options):
@@ -111,15 +116,21 @@ class Trainer:
         print("Training is using:\n  ", self.device)
 
         # data
-        datasets_dict = {"kitti": datasets.KITTIRAWDataset,
-                         "kitti_odom": datasets.KITTIOdomDataset}
+        # datasets_dict = {"kitti": datasets.KITTIRAWDataset,
+        #                  "kitti_odom": datasets.KITTIOdomDataset}
+
+        self.wanb_obj = wandb_logging.wandb_logging(options, [self.models["pose"], self.models["depth"]])
+        
+        datasets_dict = {"endovis": datasets.LungRAWDataset}
+
         self.dataset = datasets_dict[self.opt.dataset]
 
-        fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files.txt")
+        fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_ex_vivo_pig.txt")
 
         train_filenames = readlines(fpath.format("train"))
         val_filenames = readlines(fpath.format("val"))
-        img_ext = '.png' if self.opt.png else '.jpg'
+        
+        img_ext = '.png'
 
         num_train_samples = len(train_filenames)
         self.num_total_steps = num_train_samples // self.opt.batch_size * self.opt.num_epochs
@@ -127,20 +138,31 @@ class Trainer:
         train_dataset = self.dataset(
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=True, img_ext=img_ext)
+        
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
-            num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+            drop_last=True)
+        
+        # self.train_loader = DataLoader(
+        #     train_dataset, self.opt.batch_size, True,
+        #     num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+        
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
+        
+        # self.val_loader = DataLoader(
+        #     val_dataset, self.opt.batch_size, True,
+        #     num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+        
         self.val_loader = DataLoader(
-            val_dataset, self.opt.batch_size, True,
-            num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
+            val_dataset, self.opt.batch_size, True, drop_last=True)
+        
         self.val_iter = iter(self.val_loader)
 
-        self.writers = {}
-        for mode in ["train", "val"]:
-            self.writers[mode] = SummaryWriter(os.path.join(self.log_path, mode))
+        # self.writers = {}
+        # for mode in ["train", "val"]:
+        #     self.writers[mode] = SummaryWriter(os.path.join(self.log_path, mode))
 
         if not self.opt.no_ssim:
             self.ssim = SSIM()
@@ -167,6 +189,8 @@ class Trainer:
 
         self.save_opts()
 
+    
+        
     def set_train(self):
         """Convert all models to training mode
         """
@@ -193,7 +217,7 @@ class Trainer:
     def run_epoch(self):
         """Run a single epoch of training and validation
         """
-        self.model_lr_scheduler.step()
+        # self.model_lr_scheduler.step()
 
         print("Training")
         self.set_train()
@@ -207,23 +231,31 @@ class Trainer:
             self.model_optimizer.zero_grad()
             losses["loss"].backward()
             self.model_optimizer.step()
+            
 
             duration = time.time() - before_op_time
 
             # log less frequently after the first 2000 steps to save time & disk space
-            early_phase = batch_idx % self.opt.log_frequency == 0 and self.step < 2000
-            late_phase = self.step % 2000 == 0
-
-            if early_phase or late_phase:
+            # early_phase = batch_idx % self.opt.log_frequency == 0 and self.step < 2000
+            # late_phase = self.step % 2000 == 0
+            phase = batch_idx % self.opt.log_frequency == 0
+            
+            if phase:
                 self.log_time(batch_idx, duration, losses["loss"].cpu().data)
 
                 if "depth_gt" in inputs:
                     self.compute_depth_losses(inputs, outputs, losses)
 
-                self.log("train", inputs, outputs, losses)
+                self.set_eval()
+                with torch.no_grad():
+                    self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.optimizer.param_groups[0]['lr'])
+                self.set_train()
+                # self.log("train", inputs, outputs, losses)
                 self.val()
 
             self.step += 1
+        
+        self.model_lr_scheduler.step()
 
     def process_batch(self, inputs):
         """Pass a minibatch through the network and generate images and losses
@@ -322,10 +354,12 @@ class Trainer:
         """
         self.set_eval()
         try:
-            inputs = self.val_iter.next()
+
+            inputs = next(self.val_iter)
         except StopIteration:
             self.val_iter = iter(self.val_loader)
-            inputs = self.val_iter.next()
+            # inputs = self.val_iter.next()
+            inputs = next(self.val_iter)
 
         with torch.no_grad():
             outputs, losses = self.process_batch(inputs)
@@ -333,7 +367,11 @@ class Trainer:
             if "depth_gt" in inputs:
                 self.compute_depth_losses(inputs, outputs, losses)
 
-            self.log("val", inputs, outputs, losses)
+            self.log_wand("val2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.get_last_lr()[0])
+            
+            # self.log("val", inputs, outputs, losses)
+            
+            # wand 
             del inputs, outputs, losses
 
         self.set_train()
@@ -384,7 +422,7 @@ class Trainer:
                 outputs[("color", frame_id, scale)] = F.grid_sample(
                     inputs[("color", frame_id, source_scale)],
                     outputs[("sample", frame_id, scale)],
-                    padding_mode="border")
+                    padding_mode="border", align_corners=True)
 
                 if not self.opt.disable_automasking:
                     outputs[("color_identity", frame_id, scale)] = \
@@ -429,6 +467,10 @@ class Trainer:
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
+            # if self.opts.pre_trained_generator:
+            #     G_AB = GeneratorResNet(input_shape, opt.n_residual_blocks)
+                
+                
             if not self.opt.disable_automasking:
                 identity_reprojection_losses = []
                 for frame_id in self.opt.frame_ids[1:]:
@@ -479,9 +521,11 @@ class Trainer:
 
             if not self.opt.disable_automasking:
                 outputs["identity_selection/{}".format(scale)] = (
-                    idxs > identity_reprojection_loss.shape[1] - 1).float()
+                    idxs > identity_reprojection_loss.shape[1] - 1).float() # wheres is it used ?
 
             loss += to_optimise.mean()
+            
+            losses["min_loss/{}".format(scale)] = to_optimise.mean()
 
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
@@ -536,7 +580,10 @@ class Trainer:
             " | loss: {:.5f} | time elapsed: {} | time left: {}"
         print(print_string.format(self.epoch, batch_idx, samples_per_sec, loss,
                                   sec_to_hm_str(time_sofar), sec_to_hm_str(training_time_left)))
-
+    def log_wand(self, mode, outputs, losses, wand_object, step, character, lr = 0):
+        # output here is disparity image 
+        wand_object.log_data(outputs, losses, mode, character=character, step = step, learning_rate = lr) # step can also be epoch 
+        
     def log(self, mode, inputs, outputs, losses):
         """Write an event to the tensorboard events file
         """
