@@ -21,7 +21,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default="dataLaoderCheck")
+                                 default="dataphantomDataset")
         
         self.parser.add_argument("--write_split_file",
                                  help="if set, will do the train-val split and write in a file",
@@ -31,7 +31,7 @@ class MonodepthOptions:
         self.parser.add_argument("--pre_trained_generator",
                                  type=bool,
                                  help="the name of the folder to save the model in",
-                                 default="store_true")
+                                 default="store_false")
         
         self.parser.add_argument("--model_name",
                                  type=str,
@@ -140,7 +140,7 @@ class MonodepthOptions:
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
                                  help="step size of the scheduler",
-                                 default=5)
+                                 default=10)
 
         # ABLATION options
         self.parser.add_argument("--v1_multiscale",
@@ -188,7 +188,7 @@ class MonodepthOptions:
                                  type=str,
                               #    default  = None,
                                  # default  = 'models_pretrained/Model_MIA',
-                                 default = 'dataLaoderCheck/mdp/models/weights_9',
+                                 default = None,
                                  help="name of model to load")
         self.parser.add_argument("--models_to_load",
                                  nargs="+",
@@ -201,7 +201,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_frequency",
                                  type=int,
                                  help="number of batches between each tensorboard log",
-                                 default=5)
+                                 default=100)
         self.parser.add_argument("--save_frequency",
                                  type=int,
                                  help="number of epochs between each save",

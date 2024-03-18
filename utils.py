@@ -11,6 +11,17 @@ import zipfile
 from six.moves import urllib
 
 
+class Rescale(object):   
+    def __init__(self, image):
+        
+        self.min_val = image.view(image.shape[0], image.shape[1], -1).min(2)[0].view(image.shape[0], image.shape[1], 1, 1)
+        self.max_val = image.view(image.shape[0], image.shape[1], -1).max(2)[0].view(image.shape[0], image.shape[1], 1, 1)
+        self.norm = (image - self.min_val) / (self.max_val - self.min_val)
+
+    def __call__(self):
+        # img = (self.image - self.min) / (self.range)
+        return self.norm 
+    
 def readlines(filename):
     """Read all the lines in a text file and return as a list
     """

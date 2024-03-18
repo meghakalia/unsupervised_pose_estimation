@@ -12,6 +12,65 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# def silog(real1, fake1):
+#     # filter out invalid pixels
+#     real = real1.clone()
+#     fake = fake1.clone()
+#     N = (real>0).float().sum()
+#     mask1 = (real<=0)
+#     mask2 = (fake<=0)      
+#     mask3 = mask1+mask2
+#     # mask = 1.0 - (mask3>0).float()  
+#     mask = (mask3>0)
+#     fake[mask] = 1.
+#     real[mask] = 1.
+    
+#     loss_ = torch.log(real)-torch.log(fake)
+#     loss = torch.sqrt((torch.sum( loss_ ** 2) / N ) - ((torch.sum(loss_)/N)**2))
+#     return loss
+
+class SLlog(nn.Module):
+    def __init__(self):
+        super(SLlog, self).__init__()
+    
+    def forward(self, fake1, real1):
+        if not fake1.shape == real1.shape:
+            _,_,H,W = real1.shape
+            fake = F.upsample(fake, size=(H,W), mode='bilinear')
+            
+        # filter out invalid pixels
+        real = real1.clone()
+        fake = fake1.clone()
+        N = (real>0).float().sum()
+        mask1 = (real<=0)
+        mask2 = (fake<=0)      
+        mask3 = mask1+mask2
+        # mask = 1.0 - (mask3>0).float()  
+        mask = (mask3>0)
+        fake[mask] = 1.
+        real[mask] = 1.
+        
+        loss_ = torch.log(real)-torch.log(fake)
+        loss = torch.sqrt((torch.sum( loss_ ** 2) / N ) - ((torch.sum(loss_)/N)**2))
+        # loss = 100.* torch.sum( torch.abs(torch.log(real)-torch.log(fake)) ) / N
+        return loss
+
+class RMSE_log(nn.Module):
+    def __init__(self, use_cuda):
+        super(RMSE_log, self).__init__()
+        self.eps = 1e-8
+        self.use_cuda = use_cuda
+    
+    def forward(self, fake, real):
+        mask = real<1.
+        n,_,h,w = real.size()
+        fake = F.upsample(fake, size=(h,w), mode='bilinear')
+        fake += self.eps
+
+        N = len(real[mask])
+        loss = torch.sqrt( torch.sum( torch.abs(torch.log(real[mask])-torch.log(fake[mask])) ** 2 ) / N )
+        return loss
+
 
 def disp_to_depth(disp, min_depth, max_depth):
     """Convert network's sigmoid output into depth prediction

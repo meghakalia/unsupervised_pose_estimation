@@ -27,7 +27,7 @@ class wandb_logging:
         epochs=self.opts.num_epochs,
         batch_size=self.opts.batch_size,
         learning_rate=self.opts.learning_rate,
-        dataset="ex_vivo_Dataset",
+        dataset="phantom_Dataset_gan_scale_invariant_loss",
         frame_ids = self.opts.frame_ids,
         scales = self.opts.scales,
         augmentation = "True",
@@ -35,7 +35,7 @@ class wandb_logging:
         
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
-        wandb.init(project="monodepth_debug_exvivo_porcine", config=self.config, dir = 'data/logs')
+        wandb.init(project="phantom_Dataset", config=self.config, dir = 'data/logs')
         
         self.save_colored_depth = False
         
@@ -43,7 +43,7 @@ class wandb_logging:
             self.models = []
             for model in models:
                 self.models.append(model)
-                wandb.watch(self.models[-1], log_freq=250, log='all') # default is 1000, it makes the model very slow
+                wandb.watch(self.models[-1], log_freq=1000, log='all') # default is 1000, it makes the model very slow
 
         return 
 

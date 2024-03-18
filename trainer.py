@@ -29,7 +29,11 @@ from IPython import embed
 
 from datasets import LungRAWDataset
 
+from torchvision.utils import save_image
+
 import wandb_logging
+
+import torchvision.transforms as transforms
 
 class Trainer:
     def __init__(self, options):
@@ -44,7 +48,7 @@ class Trainer:
         self.parameters_to_train = []
 
         self.device = torch.device("cpu" if self.opt.no_cuda else "cuda")
-
+        self.si_loss = SLlog()
         self.num_scales = len(self.opt.scales)
         self.num_input_frames = len(self.opt.frame_ids)
         self.num_pose_frames = 2 if self.opt.pose_model_input == "pairs" else self.num_input_frames
@@ -55,6 +59,23 @@ class Trainer:
 
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
+
+        if self.opt.pre_trained_generator:
+            n_residual_blocks = 9 
+            channels = 1
+            network_name = "3cGAN"
+            dataset_name = "ex-vivo"
+            epoch_name = 50
+            input_shape = (channels, self.opt.width, self.opt.height) # this we will have to check
+            
+            self.models["pre_trained_generator"] = networks.GeneratorResNet(input_shape, n_residual_blocks)
+            self.models["pre_trained_generator"].to(self.device)
+            
+            self.models["pre_trained_generator"].load_state_dict(torch.load("saved_models/%s-%s-G_AB-%dep.pth" % (network_name, dataset_name, epoch_name)))
+            
+            self.gen_transform = transforms.Grayscale()
+            # self.normalize_transform = transforms.Normalize(0.5, 0.5)
+            
 
         self.models["encoder"] = networks.ResnetEncoder(
             self.opt.num_layers, self.opt.weights_init == "pretrained")
@@ -125,7 +146,7 @@ class Trainer:
 
         self.dataset = datasets_dict[self.opt.dataset]
 
-        fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_ex_vivo_pig.txt")
+        fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom.txt")
 
         train_filenames = readlines(fpath.format("train"))
         val_filenames = readlines(fpath.format("val"))
@@ -206,13 +227,14 @@ class Trainer:
     def train(self):
         """Run the entire training pipeline
         """
-        self.epoch = 0
-        self.step = 0
-        self.start_time = time.time()
-        for self.epoch in range(self.opt.num_epochs):
-            self.run_epoch()
-            if (self.epoch + 1) % self.opt.save_frequency == 0:
-                self.save_model()
+        with torch.autograd.set_detect_anomaly(True): 
+            self.epoch = 0
+            self.step = 0
+            self.start_time = time.time()
+            for self.epoch in range(self.opt.num_epochs):
+                self.run_epoch()
+                if (self.epoch + 1) % self.opt.save_frequency == 0:
+                    self.save_model()
 
     def run_epoch(self):
         """Run a single epoch of training and validation
@@ -249,6 +271,7 @@ class Trainer:
                 self.set_eval()
                 with torch.no_grad():
                     self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.optimizer.param_groups[0]['lr'])
+                    print('learning_rate_{}'.format(self.model_lr_scheduler.optimizer.param_groups[0]['lr']))
                 self.set_train()
                 # self.log("train", inputs, outputs, losses)
                 self.val()
@@ -287,6 +310,7 @@ class Trainer:
             outputs.update(self.predict_poses(inputs, features))
 
         self.generate_images_pred(inputs, outputs)
+        
         losses = self.compute_losses(inputs, outputs)
 
         return outputs, losses
@@ -447,7 +471,28 @@ class Trainer:
         """
         losses = {}
         total_loss = 0
+        gan_loss = 0 
 
+        if self.opt.pre_trained_generator:
+            
+            image = self.gen_transform(inputs[("color", 0, 0)])
+            fake_B1 = self.models["pre_trained_generator"](image)
+            # fake_B1_norm = 1.0 - Rescale(fake_B1)()
+            
+            gan_loss = self.si_loss(fake_B1,outputs[("disp", 0)])
+            
+            # disp = outputs[("disp", scale)]
+            # depth_norm = Rescale(outputs[("depth", 0, 0)])()
+            
+            # transforms.Normalize(0.5, 0.5)(outputs[("depth", 0, 0)])
+            # depth_norm = self.normalize_transform(outputs[("depth", 0, 0)])
+
+            # abs_diff = torch.abs(fake_B1_norm - depth_norm)
+            # l1_loss = abs_diff.view(abs_diff.shape[0], abs_diff.shape[1], -1).mean(2).mean(0)
+            # losses["gan_loss/{}".format(0)] = l1_loss
+            # gan_loss = l1_loss
+            # total_loss += l1_loss
+                
         for scale in self.opt.scales:
             loss = 0
             reprojection_losses = []
@@ -467,9 +512,6 @@ class Trainer:
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
-            # if self.opts.pre_trained_generator:
-            #     G_AB = GeneratorResNet(input_shape, opt.n_residual_blocks)
-                
                 
             if not self.opt.disable_automasking:
                 identity_reprojection_losses = []
@@ -536,7 +578,7 @@ class Trainer:
             losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
-        losses["loss"] = total_loss
+        losses["loss"] = total_loss + gan_loss *0.009
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):
