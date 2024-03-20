@@ -20,24 +20,28 @@ class wandb_logging:
         wandb.login()
         
         self.opts = options
-    
-        self.config = dict(
-        height = self.opts.height,
-        width = self.opts.width,
-        epochs=self.opts.num_epochs,
-        batch_size=self.opts.batch_size,
-        learning_rate=self.opts.learning_rate,
-        dataset="phantom_Dataset_vanilla_hyperparameter_search",
-        frame_ids = self.opts.frame_ids,
-        scales = self.opts.scales,
-        augmentation = "True",
-        align_corner="True")
+
+        self.config = vars(options)
+        self.config.update({'name':"phantom_Dataset_vanilla_hyperparameter_search"})
+        self.config.update({'align_corner':"True"})
+        self.config.update({'augmentation':"True"})
         
         
+        # self.config = dict(
+        # height = self.opts.height,
+        # width = self.opts.width,
+        # epochs=self.opts.num_epochs,
+        # batch_size=self.opts.batch_size,
+        # learning_rate=self.opts.learning_rate,
+        # dataset="phantom_Dataset_vanilla_hyperparameter_search",
+        # frame_ids = self.opts.frame_ids,
+        # scales = self.opts.scales,
+        # augmentation = "True",
+        # align_corner="True")
         
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
-        wandb.init(project="phantom_Dataset", config=self.config, dir = 'data/logs')
+        wandb.init(project="my-first-sweep", config=self.config, dir = 'data/logs')
         
         self.save_colored_depth = False
         
@@ -49,7 +53,15 @@ class wandb_logging:
 
         return 
 
-    
+    def startSweep(self, sweep_configuration, project_name, function_to_run, count):
+        sweep_id = wandb.sweep(sweep=sweep_configuration, project=project_name)
+
+        # wandb.agent(sweep_id, function=main, count=10)       
+        wandb.agent(sweep_id, function=function_to_run, count=count)
+        
+    def get_config(self):
+        return self.config
+        
     def log_data_stage2(self):
         
         return 

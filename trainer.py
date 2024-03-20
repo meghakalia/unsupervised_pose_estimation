@@ -1,4 +1,4 @@
-# Copyright Niantic 2019. Patent Pending. All rights reserved.
+# Copyright Niantic 2019. Patent Pending. All rights reserved.import
 #
 # This software is licensed under the terms of the Monodepth2 licence
 # which allows for non-commercial use only, the full terms of which are made
@@ -36,8 +36,28 @@ import wandb_logging
 import torchvision.transforms as transforms
 
 class Trainer:
-    def __init__(self, options):
+    def __init__(self, options, wandb_sweep = False, wandb_config = '', wandb_obj = None):
+        
+        if options.wandb_sweep: 
+            # self.wanb_obj = wandb_logging.wandb_logging(options)
+            # self.wandb_config = self.wanb_obj.get_config()
+            # self.sampling_frequency = self.wandb_config['sampling_frequency']
+            # self.learning_rate      = self.wandb_config['learning_rate']
+            
+            self.wanb_obj = wandb_obj
+            self.wandb_config = wandb_config
+            self.sampling_frequency = self.wandb_config['sampling_frequency']
+            self.learning_rate      = self.wandb_config['learning_rate']
+            
+        else:
+            self.wanb_obj = wandb_logging.wandb_logging(options)
+            self.sampling_frequency = self.opt.sampling_frequency
+            self.learning_rate = self.opt.learning_rate
+            
         self.opt = options
+    
+        # set the manually the hyperparamters you want to optimize using sampling_frequency and learning rate
+        
         self.log_path = os.path.join(self.opt.log_dir, self.opt.model_name)
 
         # checking height and width are multiples of 32
@@ -147,9 +167,9 @@ class Trainer:
             self.models["predictive_mask"].to(self.device)
             self.parameters_to_train += list(self.models["predictive_mask"].parameters())
 
-        self.model_optimizer = optim.Adam(self.parameters_to_train, self.opt.learning_rate)
-        self.model_lr_scheduler = optim.lr_scheduler.StepLR(
-            self.model_optimizer, self.opt.scheduler_step_size, 0.1)
+        self.model_optimizer = optim.Adam(self.parameters_to_train, self.learning_rate)
+        # self.model_lr_scheduler = optim.lr_scheduler.StepLR(
+        #     self.model_optimizer, self.opt.scheduler_step_size, 0.1)
 
         if self.opt.load_weights_folder is not None:
             self.load_model()
@@ -162,7 +182,7 @@ class Trainer:
         # datasets_dict = {"kitti": datasets.KITTIRAWDataset,
         #                  "kitti_odom": datasets.KITTIOdomDataset}
 
-        self.wanb_obj = wandb_logging.wandb_logging(options, [self.models["pose"], self.models["depth"]])
+        
         
         datasets_dict = {"endovis": datasets.LungRAWDataset}
 
@@ -170,7 +190,7 @@ class Trainer:
 
         fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom.txt")
 
-        self.sampling_frequency = self.opt.sampling_frequency
+        
         
         train_filenames = readlines(fpath.format("train"))[self.sampling_frequency:-self.sampling_frequency] # exclude frame accordingly
         val_filenames = readlines(fpath.format("val"))[self.sampling_frequency:-self.sampling_frequency]
@@ -297,15 +317,16 @@ class Trainer:
 
                 self.set_eval()
                 with torch.no_grad():
-                    self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.optimizer.param_groups[0]['lr'])
-                    print('learning_rate_{}'.format(self.model_lr_scheduler.optimizer.param_groups[0]['lr']))
+                    # self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.optimizer.param_groups[0]['lr'])
+                    self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1.)
+                    # print('learning_rate_{}'.format(self.model_lr_scheduler.optimizer.param_groups[0]['lr']))
                 self.set_train()
                 # self.log("train", inputs, outputs, losses)
                 self.val()
 
             self.step += 1
         
-        self.model_lr_scheduler.step()
+        # self.model_lr_scheduler.step()
 
     def process_batch_discriminator(self, inputs):
         
@@ -443,7 +464,8 @@ class Trainer:
             if "depth_gt" in inputs:
                 self.compute_depth_losses(inputs, outputs, losses)
 
-            self.log_wand("val2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.get_last_lr()[0])
+            # self.log_wand("val2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.get_last_lr()[0])
+            self.log_wand("val2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1.)
             
             # self.log("val", inputs, outputs, losses)
             
@@ -545,7 +567,7 @@ class Trainer:
                 losses["gan_loss/{}".format(scale)] = gan_loss
                 
                 gan_loss_total= gan_loss_total + gan_loss
-            
+        
             # get disp at multiple scales, upscale and then compare with the GAN output.
             
             
@@ -646,7 +668,7 @@ class Trainer:
             losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
-        losses["loss"] = total_loss + gan_loss_total *0.002
+        losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):

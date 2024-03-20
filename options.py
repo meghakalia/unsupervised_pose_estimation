@@ -31,7 +31,7 @@ class MonodepthOptions:
         self.parser.add_argument("--pre_trained_generator",
                                  type=bool,
                                  help="the name of the folder to save the model in",
-                                 default="store_false")
+                                 default="store_true")
         
         self.parser.add_argument("--model_name",
                                  type=str,
@@ -136,7 +136,7 @@ class MonodepthOptions:
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
-                                 default=20)
+                                 default=1)
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
                                  help="step size of the scheduler",
@@ -201,12 +201,12 @@ class MonodepthOptions:
         self.parser.add_argument("--sampling_frequency",
                                  type=int,
                                  help="sampling frequency of the frames, can be [1,2,3,4]",
-                                 default=3)
+                                 default=1)
         
         self.parser.add_argument("--log_frequency",
                                  type=int,
                                  help="number of batches between each tensorboard log",
-                                 default=100)
+                                 default=5)
         self.parser.add_argument("--save_frequency",
                                  type=int,
                                  help="number of epochs between each save",
@@ -220,6 +220,10 @@ class MonodepthOptions:
         self.parser.add_argument("--eval_mono",
                                  help="if set evaluates in mono mode",
                                  action="store_true")
+        
+        self.parser.add_argument("--wandb_sweep",
+                                 help="if set evaluates in mono mode",
+                                 action="store_false")
         
         self.parser.add_argument("--disable_median_scaling",
                                  help="if set disables median scaling in evaluation",
