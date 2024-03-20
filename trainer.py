@@ -57,6 +57,28 @@ class Trainer:
 
         self.use_pose_net = not (self.opt.use_stereo and self.opt.frame_ids == [0])
 
+        if self.opt.adversarial_prior: 
+            # Adversarial ground truths
+            self.valid = torch.ones((self.opt.height, self.opt.width, 1), requires_grad=False)
+            self.fake = torch.ones((self.opt.height, self.opt.width, 1), requires_grad=False)
+            
+            # Define model 
+            input_shape = (channels, self.opt.width, self.opt.height) # this we will have to check
+            self.Discriminator = networks.Discriminator(input_shape)
+            
+            self.criterion_Discriminator = torch.nn.MSELoss()
+            
+            self.optimizer_Discriminator = torch.optim.Adam(self.Discriminator.parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
+            
+            self.disc_model_lr_scheduler = optim.lr_scheduler.StepLR(self.model_optimizer, self.opt.scheduler_step_size, 0.1)
+            
+            
+            # loss_real = criterion_GAN(Discriminator(real_A), valid)
+            # # Fake loss (on batch of previously generated samples)
+            # fake_A2_ = fake_A2_buffer.push_and_pop(fake_A2)
+            # loss_fake = criterion_GAN(D_A2(fake_A2_.detach()), fake)
+        
+            
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
 
@@ -227,14 +249,14 @@ class Trainer:
     def train(self):
         """Run the entire training pipeline
         """
-        with torch.autograd.set_detect_anomaly(True): 
-            self.epoch = 0
-            self.step = 0
-            self.start_time = time.time()
-            for self.epoch in range(self.opt.num_epochs):
-                self.run_epoch()
-                if (self.epoch + 1) % self.opt.save_frequency == 0:
-                    self.save_model()
+        # with torch.autograd.set_detect_anomaly(True): 
+        self.epoch = 0
+        self.step = 0
+        self.start_time = time.time()
+        for self.epoch in range(self.opt.num_epochs):
+            self.run_epoch()
+            if (self.epoch + 1) % self.opt.save_frequency == 0:
+                self.save_model()
 
     def run_epoch(self):
         """Run a single epoch of training and validation
@@ -254,6 +276,9 @@ class Trainer:
             losses["loss"].backward()
             self.model_optimizer.step()
             
+            if self.opt.adversarial_prior: 
+                self.process_batch(inputs)
+                
 
             duration = time.time() - before_op_time
 
@@ -280,6 +305,31 @@ class Trainer:
         
         self.model_lr_scheduler.step()
 
+    def process_batch_discriminator(self, inputs):
+        
+        for key, ipt in inputs.items():
+            inputs[key] = ipt.to(self.device)
+            
+        # backpropagate through discriminator
+            self.optimizer_Discriminator.zero_grad()
+
+            # Real loss
+            loss_real = self.criterion_GAN(self.Discriminatoriscriminator(real_A), self.valid)
+            
+            # Fake loss (on batch of previously generated samples)
+            # output of depth network
+            #  make sure that weights are not propagated here
+            features_gan = self.models["encoder"](inputs["color_aug", 0, 0])
+            outputs_gan = self.models["depth"](features_gan)
+            
+            loss_fake = self.criterion_GAN(self.Discriminatoriscriminator(outputs_gan.detach()), self.fake)
+            # Total loss
+            loss_D = (loss_real + loss_fake) / 2
+
+            loss_D.backward()
+            self.optimizer_Discriminator.step()
+            
+        
     def process_batch(self, inputs):
         """Pass a minibatch through the network and generate images and losses
         """
@@ -413,7 +463,7 @@ class Trainer:
                     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
                 source_scale = 0
 
-            _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth)
+            _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth) # this should be 0-1
 
             outputs[("depth", 0, scale)] = depth
 
@@ -473,13 +523,29 @@ class Trainer:
         total_loss = 0
         gan_loss = 0 
 
+        gan_loss_total = 0 
         if self.opt.pre_trained_generator:
             
             image = self.gen_transform(inputs[("color", 0, 0)])
             fake_B1 = self.models["pre_trained_generator"](image)
             # fake_B1_norm = 1.0 - Rescale(fake_B1)()
             
-            gan_loss = self.si_loss(fake_B1,outputs[("disp", 0)])
+            _ , fake_disp_scaled = depth_to_disp(fake_B1)
+            
+            for scale in self.opt.scales:
+                disp = outputs[("disp", scale)]
+                # upscale 
+                disp = F.interpolate(
+                    disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+                
+                gan_loss = self.si_loss(fake_disp_scaled,disp)
+            
+                losses["gan_loss/{}".format(scale)] = gan_loss
+                
+                gan_loss_total= gan_loss_total + gan_loss
+            
+            # get disp at multiple scales, upscale and then compare with the GAN output.
+            
             
             # disp = outputs[("disp", scale)]
             # depth_norm = Rescale(outputs[("depth", 0, 0)])()
@@ -578,7 +644,7 @@ class Trainer:
             losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
-        losses["loss"] = total_loss + gan_loss *0.009
+        losses["loss"] = total_loss + gan_loss_total *0.002
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):

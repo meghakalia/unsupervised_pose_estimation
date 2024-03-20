@@ -25,9 +25,8 @@ class LungDataset(MonoDataset):
         self.side_map = {"2": 2, "3": 3, "l": 2, "r": 3}
         self.resizeTransform = transforms.Resize((self.height, self.width),
                                         interpolation=self.interp)
-
-    def check_depth(self):
         
+       
         return False
 
     def get_color(self, folder, frame_index, side, do_flip, resize = False):

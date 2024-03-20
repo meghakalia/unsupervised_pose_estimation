@@ -71,6 +71,16 @@ class RMSE_log(nn.Module):
         loss = torch.sqrt( torch.sum( torch.abs(torch.log(real[mask])-torch.log(fake[mask])) ** 2 ) / N )
         return loss
 
+def depth_to_disp(depth, min_disp=0.00001, max_disp = 1.000001):
+    """Convert network's sigmoid output into depth prediction
+    The formula for this conversion is given in the 'additional considerations'
+    section of the paper.
+    """
+    min_depth = 1 / max_disp
+    max_depth = 1 / min_disp
+    scaled_depth = min_depth + (max_depth - min_depth) * depth
+    disp = 1 / scaled_depth
+    return scaled_depth, disp
 
 def disp_to_depth(disp, min_depth, max_depth):
     """Convert network's sigmoid output into depth prediction

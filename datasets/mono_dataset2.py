@@ -10,6 +10,7 @@ from PIL import ImageFile
 import torch
 import torch.utils.data as data
 from torchvision import transforms
+from torchvision.utils import save_image, make_grid
 
 ImageFile.LOAD_TRUNCATED_IMAGES=True
 
@@ -42,7 +43,8 @@ class MonoDataset(data.Dataset):
                  frame_idxs,
                  num_scales,
                  is_train=False,
-                 img_ext='.png'):
+                 img_ext='.png', 
+                 adversarial_training = False):
         super(MonoDataset, self).__init__()
 
         self.data_path = data_path
@@ -72,9 +74,15 @@ class MonoDataset(data.Dataset):
             #     self.brightness, self.contrast, self.saturation, self.hue) # old
             transforms.ColorJitter(
                 self.brightness, self.contrast, self.saturation, self.hue)
+            
+            transforms.RandomHorizontalFlip()
+            transforms.RandomRotation()
+            
+            
+            
         except TypeError:
-            self.brightness = 0.2
-            self.contrast = 0.2
+            self.brightness = 0.5
+            self.contrast = 0.3
             self.saturation = 0.2
             self.hue = 0.1
 
@@ -83,9 +91,15 @@ class MonoDataset(data.Dataset):
             s = 2 ** i
             self.resize[i] = transforms.Resize((self.height // s, self.width // s),
                                          interpolation=self.interp)
+
+        self.transforms_aug = transforms.Compose([
+                transforms.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomAutocontrast(),
+                transforms.RandomRotation(degrees = 30)])
         
-        
-        self.load_depth = self.check_depth()
+        # self.load_depth = self.check_depth()
+        self.load_depth = False
 
     def preprocess(self, inputs, color_aug):
         """Resize colour images to the required scales and augment if required
@@ -164,8 +178,10 @@ class MonoDataset(data.Dataset):
             inputs[("inv_K", scale)] = torch.from_numpy(inv_K)
 
         if do_color_aug:
-            color_aug = transforms.ColorJitter(
-                self.brightness, self.contrast, self.saturation, self.hue)
+            color_aug = self.transforms_aug
+            # color_aug = transforms.ColorJitter(
+            #     self.brightness, self.contrast, self.saturation, self.hue)
+            #get_params
         else:
             color_aug = (lambda x: x)
 
@@ -187,9 +203,7 @@ class MonoDataset(data.Dataset):
 
             inputs["stereo_T"] = torch.from_numpy(stereo_T)
             
-        # save input [-1,0,1]
-        # self.save_images(inputs, frame_index)   
-        
+        # save_image(make_grid([inputs[("color", 0, 0)], inputs[("color_aug", 0, 0)]]), "data_{}.png".format(index) ,normalize=False, scale_each=False)
         return inputs
 
     def save_images(self, inputs, frame_index, folder="log_dataset_debug"):

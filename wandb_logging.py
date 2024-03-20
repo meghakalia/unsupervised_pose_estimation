@@ -27,7 +27,7 @@ class wandb_logging:
         epochs=self.opts.num_epochs,
         batch_size=self.opts.batch_size,
         learning_rate=self.opts.learning_rate,
-        dataset="phantom_Dataset_gan_scale_invariant_loss",
+        dataset="phantom_Dataset_gan_scale_invariant_loss_multiscale_gan",
         frame_ids = self.opts.frame_ids,
         scales = self.opts.scales,
         augmentation = "True",

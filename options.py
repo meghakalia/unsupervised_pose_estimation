@@ -21,7 +21,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default="dataphantomDataset")
+                                 default="data_gan_depth_to_disp")
         
         self.parser.add_argument("--write_split_file",
                                  help="if set, will do the train-val split and write in a file",
@@ -187,8 +187,8 @@ class MonodepthOptions:
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
                               #    default  = None,
-                                 # default  = 'models_pretrained/Model_MIA',
-                                 default = None,
+                                 default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
+                                 # default = None,
                                  help="name of model to load")
         self.parser.add_argument("--models_to_load",
                                  nargs="+",
@@ -240,6 +240,15 @@ class MonodepthOptions:
                                  help="if set assume we are loading eigen results from npy but "
                                       "we want to evaluate using the new benchmark.",
                                  action="store_true")
+        
+        self.parser.add_argument("--adversarial_prior",
+                                 help="whether we want to include the prior unity CT labels for depth",
+                                 action="store_true")
+        
+        self.parser.add_argument("--discriminator_lr", type=float, default=0.0002, help="adam: learning rate")
+        self.parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
+        self.parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
+
         self.parser.add_argument("--eval_out_dir",
                                  help="if set will output the disparities to this folder",
                                  type=str)
