@@ -198,6 +198,11 @@ class MonodepthOptions:
                               #    default=["position_encoder", "position"])
 
         # LOGGING options
+        self.parser.add_argument("--sampling_frequency",
+                                 type=int,
+                                 help="sampling frequency of the frames, can be [1,2,3,4]",
+                                 default=3)
+        
         self.parser.add_argument("--log_frequency",
                                  type=int,
                                  help="number of batches between each tensorboard log",
@@ -211,9 +216,11 @@ class MonodepthOptions:
         self.parser.add_argument("--eval_stereo",
                                  help="if set evaluates in stereo mode",
                                  action="store_true")
+        
         self.parser.add_argument("--eval_mono",
                                  help="if set evaluates in mono mode",
                                  action="store_true")
+        
         self.parser.add_argument("--disable_median_scaling",
                                  help="if set disables median scaling in evaluation",
                                  action="store_true")

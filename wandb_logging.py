@@ -27,11 +27,13 @@ class wandb_logging:
         epochs=self.opts.num_epochs,
         batch_size=self.opts.batch_size,
         learning_rate=self.opts.learning_rate,
-        dataset="phantom_Dataset_gan_scale_invariant_loss_multiscale_gan",
+        dataset="phantom_Dataset_vanilla_hyperparameter_search",
         frame_ids = self.opts.frame_ids,
         scales = self.opts.scales,
         augmentation = "True",
         align_corner="True")
+        
+        
         
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
@@ -89,9 +91,7 @@ class wandb_logging:
                 image_list_pred_color = []
                 
                 for frame_id in self.config['frame_ids'][1:]: # what is logged here 
-            
-    
-                
+
                 # image_list.append(inputs[("color", 0, 0)][j].data)
                 
                     # list_1 = outputs[("registration", s, frame_id)][:4,:,:]
@@ -136,6 +136,7 @@ class wandb_logging:
                     self.log_image_grid(mode = mode, image_list = c_depth, scale = s, caption = 'depth_', character = ''.join((character,"{}".format(s))), step = step)
                     
                     c_automask = torch.concat(image_list_automask, 0)
+                    c_automask = c_automask[:, None, :, :]
                     self.log_image_grid(mode = mode, image_list = c_automask, scale = s, caption = 'automask_ ', character = ''.join((character,"{}".format(s))), step = step)
                     
                     c_pred_color = torch.concat(image_list_pred_color, 0)
@@ -162,6 +163,7 @@ class wandb_logging:
     
     def log_image_grid(self, mode, image_list, scale, caption, character = '', step= 1):
         img_grid = torchvision.utils.make_grid(image_list)
+        
         npimg = img_grid.permute(1, 2, 0).cpu().numpy()
         self.log_single_image(''.join((mode,str(scale),caption)), image = npimg, caption = "{}_{}_{}_{}".format(character, mode, scale, ''.join(caption)), step=step)
         return 

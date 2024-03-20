@@ -44,6 +44,7 @@ class MonoDataset(data.Dataset):
                  num_scales,
                  is_train=False,
                  img_ext='.png', 
+                 sampling_frequency = 1, 
                  adversarial_training = False):
         super(MonoDataset, self).__init__()
 
@@ -62,6 +63,8 @@ class MonoDataset(data.Dataset):
         self.loader = pil_loader
         self.to_tensor = transforms.ToTensor()
         self.to_PIL = transforms.ToPILImage()
+        
+        self.sampling_frequency = sampling_frequency
 
         # We need to specify augmentations differently in newer versions of torchvision.
         # We first try the newer tuple version; if this fails we fall back to scalars
@@ -72,14 +75,7 @@ class MonoDataset(data.Dataset):
             self.hue = (-0.1, 0.1)
             # transforms.ColorJitter.get_params(
             #     self.brightness, self.contrast, self.saturation, self.hue) # old
-            transforms.ColorJitter(
-                self.brightness, self.contrast, self.saturation, self.hue)
-            
-            transforms.RandomHorizontalFlip()
-            transforms.RandomRotation()
-            
-            
-            
+
         except TypeError:
             self.brightness = 0.5
             self.contrast = 0.3
@@ -95,8 +91,11 @@ class MonoDataset(data.Dataset):
         self.transforms_aug = transforms.Compose([
                 transforms.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue),
                 transforms.RandomHorizontalFlip(p=0.5),
-                transforms.RandomAutocontrast(),
-                transforms.RandomRotation(degrees = 30)])
+                transforms.RandomAutocontrast()
+                # transforms.RandomRotation(degrees = 30)
+                ])
+        
+        # transforms.RandomRotation(degrees = 30)
         
         # self.load_depth = self.check_depth()
         self.load_depth = False
@@ -163,7 +162,7 @@ class MonoDataset(data.Dataset):
                 other_side = {"r": "l", "l": "r"}[side]
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
             else:
-                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i, side, do_flip)
+                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(self.sampling_frequency - 1), side, do_flip)
 
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):

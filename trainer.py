@@ -170,8 +170,10 @@ class Trainer:
 
         fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom.txt")
 
-        train_filenames = readlines(fpath.format("train"))
-        val_filenames = readlines(fpath.format("val"))
+        self.sampling_frequency = self.opt.sampling_frequency
+        
+        train_filenames = readlines(fpath.format("train"))[self.sampling_frequency:-self.sampling_frequency] # exclude frame accordingly
+        val_filenames = readlines(fpath.format("val"))[self.sampling_frequency:-self.sampling_frequency]
         
         img_ext = '.png'
 
