@@ -41,7 +41,7 @@ class wandb_logging:
         
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
-        wandb.init(project="my-first-sweep", config=self.config, dir = 'data/logs')
+        wandb.init(project="hyper-param-tuning_no_gan", config=self.config, dir = 'data/logs')
         
         self.save_colored_depth = False
         

@@ -36,7 +36,10 @@ import wandb_logging
 import torchvision.transforms as transforms
 
 class Trainer:
-    def __init__(self, options, wandb_sweep = False, wandb_config = '', wandb_obj = None):
+    def __init__(self, options, lr = 1e-6, sampling = 1, wandb_sweep = False, wandb_config = '', wandb_obj = None):
+        
+        self.opt = options
+        print('learning rate {} sampling frequency : {}'.format(lr, sampling))
         
         if options.wandb_sweep: 
             # self.wanb_obj = wandb_logging.wandb_logging(options)
@@ -50,11 +53,19 @@ class Trainer:
             self.learning_rate      = self.wandb_config['learning_rate']
             
         else:
-            self.wanb_obj = wandb_logging.wandb_logging(options)
-            self.sampling_frequency = self.opt.sampling_frequency
-            self.learning_rate = self.opt.learning_rate
+            # self.wanb_obj = wandb_logging.wandb_logging(options)
+            # self.sampling_frequency = self.opt.sampling_frequency
+            # self.learning_rate = self.opt.learning_rate
             
-        self.opt = options
+            # parameter search 
+            self.sampling_frequency = sampling
+            self.learning_rate = lr
+            
+            self.opt.learning_rate = lr
+            self.opt.sampling_frequency = sampling
+            self.wanb_obj = wandb_logging.wandb_logging(self.opt)
+            
+        
     
         # set the manually the hyperparamters you want to optimize using sampling_frequency and learning rate
         

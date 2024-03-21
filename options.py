@@ -29,9 +29,8 @@ class MonodepthOptions:
 
         # TRAINING options
         self.parser.add_argument("--pre_trained_generator",
-                                 type=bool,
-                                 help="the name of the folder to save the model in",
-                                 default="store_true")
+                                 help="whether pretrained gan is on or off ",
+                                 action="store_true")
         
         self.parser.add_argument("--model_name",
                                  type=str,
@@ -136,7 +135,7 @@ class MonodepthOptions:
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
-                                 default=1)
+                                 default=6)
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
                                  help="step size of the scheduler",
@@ -186,8 +185,8 @@ class MonodepthOptions:
         # LOADING options
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
-                              #    default  = None,
-                                 default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
+                                 default  = None,
+                                 # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
                                  # default = None,
                                  help="name of model to load")
         self.parser.add_argument("--models_to_load",
@@ -206,7 +205,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_frequency",
                                  type=int,
                                  help="number of batches between each tensorboard log",
-                                 default=5)
+                                 default=100)
         self.parser.add_argument("--save_frequency",
                                  type=int,
                                  help="number of epochs between each save",
@@ -223,7 +222,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--wandb_sweep",
                                  help="if set evaluates in mono mode",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--disable_median_scaling",
                                  help="if set disables median scaling in evaluation",
