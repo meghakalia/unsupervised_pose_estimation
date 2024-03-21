@@ -59,6 +59,10 @@ class wandb_logging:
         # wandb.agent(sweep_id, function=main, count=10)       
         wandb.agent(sweep_id, function=function_to_run, count=count)
         
+    def finishWandb(self):
+        wandb.finish()
+        return
+    
     def get_config(self):
         return self.config
         
