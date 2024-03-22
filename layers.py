@@ -186,6 +186,8 @@ class ConvBlock(nn.Module):
         out = self.nonlin(out)
         return out
 
+def batchNorm(num_ch_dec):
+    return nn.BatchNorm2d(num_ch_dec)
 
 class Conv3x3(nn.Module):
     """Layer to pad and convolve input
@@ -267,6 +269,19 @@ def upsample(x):
     """
     return F.interpolate(x, scale_factor=2, mode="nearest")
 
+class deconv(nn.Module):
+    """Layer to perform a convolution followed by ELU
+    """
+    def __init__(self, ch_in, ch_out):
+        super(deconv, self).__init__()
+
+        self.deconvlayer = nn.ConvTranspose2d(ch_in, ch_out, 3, stride=2, padding=1)
+        
+    def forward(self, x):
+        out = self.deconvlayer(x)
+        return out
+
+    
 
 def get_smooth_loss(disp, img):
     """Computes the smoothness loss for a disparity image

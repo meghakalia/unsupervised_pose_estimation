@@ -41,7 +41,7 @@ class wandb_logging:
         
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
-        wandb.init(project="hyper-param-tuning_no_gan", config=self.config, dir = 'data/logs')
+        wandb.init(project="batch_norm_hyper-param-tuning_no_gan", config=self.config, dir = 'data/logs')
         
         self.save_colored_depth = False
         
@@ -67,7 +67,6 @@ class wandb_logging:
         return self.config
         
     def log_data_stage2(self):
-        
         return 
     
     def log_gradients(self, names=["gradient_norm"]):

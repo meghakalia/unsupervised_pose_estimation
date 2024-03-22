@@ -25,14 +25,15 @@ if opts.wandb_sweep:
 def main():
     
     # learning_rate_opt = [2, 3, 4, 5, 6, 7 , 8]
-    learning_rate_opt = np.random.permutation(7) + 2
-    for i in range(7):
-    #    idx = np.random.randint(0,6)
-       learn_rate = 10**(-float(learning_rate_opt[i]))
-       
-       for frequency in [1, 2, 3]:
-           trainer = Trainer(opts, lr = learn_rate, sampling=frequency)
-           trainer.train()
+    # learning_rate_opt = np.random.permutation(7) + 2
+    # for i in range(7):
+    # #    idx = np.random.randint(0,6)
+    #    learn_rate = 10**(-float(learning_rate_opt[i]))
+    learn_rate = 10**(-4)
+    frequency = 3
+    # for frequency in [1, 2, 3]:
+    trainer = Trainer(opts, lr = learn_rate, sampling=frequency)
+    trainer.train()
     
 if opts.wandb_sweep: 
     sweep_configuration = {

@@ -18,7 +18,6 @@ class ResidualBlock(nn.Module):
     def forward(self, x):
         return x + self.block(x)
 
-
 class GeneratorResNet(nn.Module):
     def __init__(self, input_shape, num_residual_blocks):
         super(GeneratorResNet, self).__init__()
