@@ -15,7 +15,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
-from torchview import draw_graph
 
 import json
 

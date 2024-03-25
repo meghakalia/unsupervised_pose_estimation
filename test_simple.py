@@ -11,7 +11,7 @@ import matplotlib.cm as cm
 import cv2
 import torch
 from torchvision import transforms, datasets
-from options_eval import MonodepthEvalOptions
+# from options_eval import MonodepthEvalOptions
 
 import networks
 from layers import disp_to_depth, transformation_from_parameters
@@ -27,7 +27,7 @@ def parse_args():
                         help='path to a test image or folder of images',
                         default = 'data/dataset_14/keyframe_1' )
     parser.add_argument('--model_path', type=str,
-                        help='path to the test model', default ='test/weights_19') #models_pretrained/Model_MIA")
+                        help='path to the test model', default ='data_gan_depth_to_disp/mdp/models/weights_15') #models_pretrained/Model_MIA")
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="png")
     parser.add_argument("--no_cuda",

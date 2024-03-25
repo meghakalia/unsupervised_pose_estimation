@@ -21,7 +21,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default="data_gan_depth_to_disp")
+                                 default="/data/models")
         
         self.parser.add_argument("--write_split_file",
                                  help="if set, will do the train-val split and write in a file",
