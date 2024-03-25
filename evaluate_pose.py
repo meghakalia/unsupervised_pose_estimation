@@ -179,7 +179,8 @@ def evaluate(opt):
     opt.frame_ids = [0, 1]  # pose network only takes two frames as input
 
     count = 0 
-
+    axisangle_ = []
+    translation_ = []
     with torch.no_grad():
         for inputs in dataloader:
             
@@ -192,6 +193,8 @@ def evaluate(opt):
 
             features = [pose_encoder(all_color_aug)]
             axisangle, translation = pose_decoder(features)
+            axisangle_.append(axisangle[:, 0].cpu().numpy())
+            translation_.append(translation[:, 0].cpu().numpy())
 
             pred_poses.append(
                 transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().numpy())

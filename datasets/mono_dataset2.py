@@ -47,7 +47,7 @@ class MonoDataset(data.Dataset):
                  img_ext='.png', 
                  sampling_frequency = 1, 
                  adversarial_training = False, 
-                 adversarial_prior = True,
+                 adversarial_prior = False,
                  filename_ct_prior = ''
                  ):
         super(MonoDataset, self).__init__()

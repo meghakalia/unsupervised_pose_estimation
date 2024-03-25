@@ -28,6 +28,7 @@ def parse_args():
                         default = 'data/dataset_14/keyframe_1' )
     parser.add_argument('--model_path', type=str,
                         help='path to the test model', default ='test/test_dict/weights_14') #models_pretrained/Model_MIA")
+
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="png")
     parser.add_argument("--no_cuda",
@@ -79,7 +80,7 @@ def test_simple(args):
     depth_decoder = networks.DepthDecoder(num_ch_enc=encoder.num_ch_enc, scales=range(4))
 
     loaded_dict = torch.load(depth_decoder_path, map_location=device)
-    depth_decoder.load_state_dict(loaded_dict)
+    depth_decoder.load_state_dict(loaded_dict, strict=False)
 
     depth_decoder.to(device)
     depth_decoder.eval()
