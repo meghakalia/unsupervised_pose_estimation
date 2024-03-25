@@ -64,8 +64,6 @@ class DepthDecoder(nn.Module):
         for i in range(4, -1, -1):
             x = self.convs[("upconv", i, 0)](x)
             x = [self.convs[("deconv", i, 0)](x)]
-            # x = [deconv(x)]
-            # x = [upsample(x)] # why not deconv 
             if self.use_skips and i > 0:
                 x += [input_features[i - 1]]
             x = torch.cat(x, 1)

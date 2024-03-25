@@ -12,6 +12,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from torchmetrics.image.fid import FrechetInceptionDistance
+
 # def silog(real1, fake1):
 #     # filter out invalid pixels
 #     real = real1.clone()
@@ -28,6 +30,13 @@ import torch.nn.functional as F
 #     loss_ = torch.log(real)-torch.log(fake)
 #     loss = torch.sqrt((torch.sum( loss_ ** 2) / N ) - ((torch.sum(loss_)/N)**2))
 #     return loss
+
+def computeFID(real_images, fake_images, fid_criterion):
+    # metric = FrechetInceptionDistance(feature)
+    fid_criterion.update(real_images, real=True)
+    fid_criterion.update(fake_images, real=False)
+    return fid_criterion.compute()
+    
 
 class SLlog(nn.Module):
     def __init__(self):

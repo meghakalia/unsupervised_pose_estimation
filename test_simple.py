@@ -27,7 +27,7 @@ def parse_args():
                         help='path to a test image or folder of images',
                         default = 'data/dataset_14/keyframe_1' )
     parser.add_argument('--model_path', type=str,
-                        help='path to the test model', default ='data_gan_depth_to_disp/mdp/models/weights_15') #models_pretrained/Model_MIA")
+                        help='path to the test model', default ='test/test_dict/weights_14') #models_pretrained/Model_MIA")
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="png")
     parser.add_argument("--no_cuda",
@@ -145,8 +145,9 @@ def test_simple(args):
             outputs = depth_decoder(features)
 
             disp = outputs[("disp", 0)]
-            disp_resized = torch.nn.functional.interpolate(
-                disp, (original_height * 2, original_width * 2), mode="bilinear", align_corners=False)
+            disp_resized = disp
+            # disp_resized = torch.nn.functional.interpolate(
+            #     disp, (original_height * 2, original_width * 2), mode="bilinear", align_corners=False)
             
             # Saving numpy file
             output_name = os.path.splitext(os.path.basename(image_path))[0]

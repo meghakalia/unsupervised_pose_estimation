@@ -42,12 +42,20 @@ class MonoDataset(data.Dataset):
                  width,
                  frame_idxs,
                  num_scales,
+                 len_ct_depth_data = 0, 
                  is_train=False,
                  img_ext='.png', 
                  sampling_frequency = 1, 
-                 adversarial_training = False):
+                 adversarial_training = False, 
+                 adversarial_prior = True,
+                 filename_ct_prior = ''
+                 ):
         super(MonoDataset, self).__init__()
 
+        self.adversarial_prior = adversarial_prior
+        self.len_ct_depth_data = len_ct_depth_data
+        self.filenames_ct_prior = filename_ct_prior
+        
         self.data_path = data_path
         self.filenames = filenames
         self.height = height
@@ -95,6 +103,11 @@ class MonoDataset(data.Dataset):
                 # transforms.RandomAutocontrast()
                 # transforms.RandomRotation(degrees = 30)
                 ])
+        
+        self.transforms_ct_depth = transforms.Compose([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(degrees = 30)
+            ])
         
         # transforms.RandomRotation(degrees = 30)
         
@@ -151,6 +164,15 @@ class MonoDataset(data.Dataset):
             2       images resized to (self.width // 4, self.height // 4)
             3       images resized to (self.width // 8, self.height // 8)
         """
+        
+        if self.adversarial_prior:
+            # generate a random index. 
+            image_idx = torch.randint(self.len_ct_depth_data, (1,))
+            frame_index, folder, side = self.get_folder_path(self.filenames_ct_prior[image_idx])
+            img = self.get_color(folder, frame_index, side, do_flip = False)
+            inputs[('ct_prior', 0)] = self.to_tensor(self.transforms_ct_depth(self.resize[i](img)))
+            
+            
         inputs = {}
 
         do_color_aug = self.is_train and random.random() > 0.5

@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
+from torchmetrics.image.fid import FrechetInceptionDistance
 
 
 import json
@@ -98,8 +98,9 @@ class Trainer:
             input_shape = (channels, self.opt.width, self.opt.height) # this we will have to check
             self.Discriminator = networks.Discriminator(input_shape)
             
+            # self.criterion_Discriminator = FrechetInceptionDistance(feature=64)
             self.criterion_Discriminator = torch.nn.MSELoss()
-            
+        
             self.optimizer_Discriminator = torch.optim.Adam(self.Discriminator.parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
             
             self.disc_model_lr_scheduler = optim.lr_scheduler.StepLR(self.model_optimizer, self.opt.scheduler_step_size, 0.1)
@@ -311,10 +312,15 @@ class Trainer:
             losses["loss"].backward()
             self.model_optimizer.step()
             
-            if self.opt.adversarial_prior: 
-                self.process_batch(inputs)
+            if self.opt.adversarial_prior:
+                self.discriminator_train_step(inputs)
+            
+                # loss_real = criterion_GAN(Discriminator(real_A), valid)
+            # # Fake loss (on batch of previously generated samples)
+            # fake_A2_ = fake_A2_buffer.push_and_pop(fake_A2)
+            # loss_fake = criterion_GAN(D_A2(fake_A2_.detach()), fake)
                 
-
+                
             duration = time.time() - before_op_time
 
             # log less frequently after the first 2000 steps to save time & disk space
@@ -341,7 +347,7 @@ class Trainer:
         
         # self.model_lr_scheduler.step()
 
-    def process_batch_discriminator(self, inputs):
+    def discriminator_train_step(self, inputs, outputs):
         
         for key, ipt in inputs.items():
             inputs[key] = ipt.to(self.device)
@@ -350,20 +356,27 @@ class Trainer:
             self.optimizer_Discriminator.zero_grad()
 
             # Real loss
-            loss_real = self.criterion_GAN(self.Discriminatoriscriminator(real_A), self.valid)
-            
+            CT_depth = ''
+            loss_real = self.criterion_Discriminator(self.Discriminator(CT_depth), self.valid)
+
             # Fake loss (on batch of previously generated samples)
             # output of depth network
             #  make sure that weights are not propagated here
+            # features_gan = self.models["encoder"](inputs["color_aug", 0, 0])
+            # outputs_gan = self.models["depth"](features_gan)
+            
+            # do I need to calculate this again 
             features_gan = self.models["encoder"](inputs["color_aug", 0, 0])
             outputs_gan = self.models["depth"](features_gan)
             
-            loss_fake = self.criterion_GAN(self.Discriminatoriscriminator(outputs_gan.detach()), self.fake)
+            loss_fake = self.criterion_Discriminator(self.Discriminator(outputs_gan.detach()), self.fake)
             # Total loss
             loss_D = (loss_real + loss_fake) / 2
 
             loss_D.backward()
             self.optimizer_Discriminator.step()
+            
+            
             
         
     def process_batch(self, inputs):
@@ -389,6 +402,11 @@ class Trainer:
             features = self.models["encoder"](inputs["color_aug", 0, 0])
             outputs = self.models["depth"](features)
 
+        if self.opt.adversarial_prior: 
+                # how close depth network is to creating the original looking images 
+            outputs["discriminator_out"] = self.Discriminator(outputs)
+            
+                
         if self.opt.predictive_mask:
             outputs["predictive_mask"] = self.models["predictive_mask"](features)
 
@@ -561,6 +579,11 @@ class Trainer:
         gan_loss = 0 
 
         gan_loss_total = 0 
+        if self.opt.adversarial_prior:
+            # how far is the model from valid examples 
+            loss_real = self.criterion_Discriminator(outputs['discriminator_out'], self.valid)
+            
+                
         if self.opt.pre_trained_generator:
             
             image = self.gen_transform(inputs[("color", 0, 0)])
