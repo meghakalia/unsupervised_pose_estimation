@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from torchmetrics.image.fid import FrechetInceptionDistance
+# from torchmetrics.image.fid import FrechetInceptionDistance
 
 # def silog(real1, fake1):
 #     # filter out invalid pixels
@@ -298,7 +298,7 @@ class deconv(nn.Module):
         out = self.deconvlayer(x)
         return out
 
-    
+
 
 def get_smooth_loss(disp, img):
     """Computes the smoothness loss for a disparity image
@@ -368,3 +368,116 @@ def compute_depth_errors(gt, pred):
     sq_rel = torch.mean((gt - pred) ** 2 / gt)
 
     return abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3
+
+
+""" Parts of the U-Net model """
+
+
+class DoubleConv(nn.Module):
+    """(convolution => [BN] => ReLU) * 2"""
+
+    def __init__(self, in_channels, out_channels, mid_channels=None):
+        super().__init__()
+        if not mid_channels:
+            mid_channels = out_channels
+        self.double_conv = nn.Sequential(
+            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(mid_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.double_conv(x)
+
+
+class Down(nn.Module):
+    """Downscaling with maxpool then double conv"""
+
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.maxpool_conv = nn.Sequential(
+            nn.MaxPool2d(2),
+            DoubleConv(in_channels, out_channels)
+        )
+
+    def forward(self, x):
+        return self.maxpool_conv(x)
+
+
+class Up(nn.Module):
+    """Upscaling then double conv"""
+
+    def __init__(self, in_channels, out_channels, bilinear=True):
+        super().__init__()
+
+        # if bilinear, use the normal convolutions to reduce the number of channels
+        if bilinear:
+            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
+        else:
+            self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
+            self.conv = DoubleConv(in_channels, out_channels)
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+        # input is CHW
+        diffY = x2.size()[2] - x1.size()[2]
+        diffX = x2.size()[3] - x1.size()[3]
+
+        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
+                        diffY // 2, diffY - diffY // 2])
+        # if you have padding issues, see
+        # https://github.com/HaiyongJiang/U-Net-Pytorch-Unstructured-Buggy/commit/0e854509c2cea854e247a9c615f175f76fbb2e3a
+        # https://github.com/xiaopeng-liao/Pytorch-UNet/commit/8ebac70e633bac59fc22bb5195e513d5832fb3bd
+        x = torch.cat([x2, x1], dim=1)
+        return self.conv(x)
+
+
+class OutConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(OutConv, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+
+    def forward(self, x):
+        return self.conv(x)
+
+# def gaussian_fn(M, std):
+#     n = torch.arange(0, M) - (M - 1.0) / 2.0
+#     sig2 = 2 * std * std
+#     w = torch.exp(-n ** 2 / sig2)
+#     return w
+
+# def gkern(kernlen=256, std=128):
+#     """Returns a 2D Gaussian kernel array."""
+#     gkern1d = gaussian_fn(kernlen, std=std) 
+#     gkern2d = torch.outer(gkern1d, gkern1d)
+#     return gkern2d
+
+# A = np.random.rand(256*256).reshape([256,256])
+# A = torch.from_numpy(A)
+# guassian_filter = gkern(256, std=32)
+
+
+# class GaussianLayer(nn.Module):
+#     def __init__(self):
+#         super(GaussianLayer, self).__init__()
+#         self.seq = nn.Sequential(
+#             nn.ReflectionPad2d(10), 
+#             nn.Conv2d(3, 3, 21, stride=1, padding=0, bias=None, groups=3)
+#         )
+
+#         self.weights_init()
+        
+#     def forward(self, x):
+#         return self.seq(x)
+
+#     def weights_init(self):
+#         n= np.zeros((21,21))
+#         n[10,10] = 1
+#         k = scipy.ndimage.gaussian_filter(n,sigma=3)
+#         for name, f in self.named_parameters():
+#             f.data.copy_(torch.from_numpy(k))
+            

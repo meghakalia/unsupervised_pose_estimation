@@ -41,7 +41,7 @@ class wandb_logging:
         
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
-        wandb.init(project="disriminator_prior", config=self.config, dir = 'data/logs')
+        wandb.init(project="drop_out_test", config=self.config, dir = 'data/logs')
         
         self.save_colored_depth = False
         

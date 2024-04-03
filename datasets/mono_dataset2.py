@@ -42,20 +42,20 @@ class MonoDataset(data.Dataset):
                  width,
                  frame_idxs,
                  num_scales,
-                 len_ct_depth_data = 0, 
+                 len_ct_depth_data, 
                  is_train=False,
                  img_ext='.png', 
                  sampling_frequency = 1, 
-                 adversarial_training = False, 
-                 adversarial_prior = False,
-                 filename_ct_prior = ''
+                 adversarial_prior = False, 
+                 data_augment = True
                  ):
         super(MonoDataset, self).__init__()
 
         self.adversarial_prior = adversarial_prior
         self.len_ct_depth_data = len_ct_depth_data
-        self.filenames_ct_prior = filename_ct_prior
+        # self.filenames_ct_prior = filename_ct_prior
         
+        self.data_aug = data_augment
         self.data_path = data_path
         self.filenames = filenames
         self.height = height
@@ -164,18 +164,26 @@ class MonoDataset(data.Dataset):
             2       images resized to (self.width // 4, self.height // 4)
             3       images resized to (self.width // 8, self.height // 8)
         """
-        
+        inputs = {}
+
         if self.adversarial_prior:
             # generate a random index. 
             image_idx = torch.randint(self.len_ct_depth_data, (1,))
-            frame_index, folder, side = self.get_folder_path(self.filenames_ct_prior[image_idx])
-            img = self.get_color(folder, frame_index, side, do_flip = False)
-            inputs[('ct_prior', 0)] = self.to_tensor(self.transforms_ct_depth(self.resize[i](img)))
+            img_path = os.path.join('data/prior', 'rgb_{}.png'.format(image_idx[0]+1))
+            if not os.path.isfile(img_path):
+                return print('no file{}'.format(img_path))
+            color = self.loader(img_path)
+            # frame_index, folder, side = self.get_folder_path(self.filenames_ct_prior[image_idx])
+            # img = self.get_color(folder, frame_index, side, do_flip = False)
+            inputs[('ct_prior', 0)] = self.to_tensor(self.transforms_ct_depth(self.resize[0](color)))[0][None, :, :]
             
             
-        inputs = {}
-
-        do_color_aug = self.is_train and random.random() > 0.5
+        if self.data_aug: 
+            do_color_aug = self.is_train and random.random() > 0.5
+        else:
+            do_color_aug = False
+            
+        
         do_flip = self.is_train and random.random() > 0.5
 
         frame_index, folder, side = self.get_folder_path(self.filenames[index])

@@ -29,8 +29,8 @@ def main():
     # for i in range(7):
     # #    idx = np.random.randint(0,6)
     #    learn_rate = 10**(-float(learning_rate_opt[i]))
-    learn_rate = 10**(-4)
-    frequency = 3
+    learn_rate = 10**(-5)
+    frequency = 2
     # for frequency in [1, 2, 3]:
     trainer = Trainer(opts, lr = learn_rate, sampling=frequency)
     trainer.train()

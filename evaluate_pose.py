@@ -198,7 +198,9 @@ def evaluate(opt):
 
             pred_poses.append(
                 transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().numpy())
-
+            
+    # if want to save
+    # np.savez('pose_prediction.npz', pred_poses)
     pred_poses = np.concatenate(pred_poses)
 
     gt_path = os.path.join(os.path.dirname(__file__), "splits", "scared", "gt_poses_sq2.npz")

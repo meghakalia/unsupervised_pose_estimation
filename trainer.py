@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchmetrics.image.fid import FrechetInceptionDistance
+# from torchmetrics.image.fid import FrechetInceptionDistance
 
 
 import json
@@ -35,6 +35,8 @@ from torchvision.utils import save_image
 import wandb_logging
 
 import torchvision.transforms as transforms
+
+# from torchviz import make_dot
 
 class Trainer:
     def __init__(self, options, lr = 1e-6, sampling = 1, wandb_sweep = False, wandb_config = '', wandb_obj = None):
@@ -90,20 +92,22 @@ class Trainer:
         self.use_pose_net = not (self.opt.use_stereo and self.opt.frame_ids == [0])
 
         if self.opt.adversarial_prior: 
-            # Adversarial ground truths
-            self.valid = torch.ones((self.opt.height, self.opt.width, 1), requires_grad=False)
-            self.fake = torch.ones((self.opt.height, self.opt.width, 1), requires_grad=False)
-            
             # Define model 
-            input_shape = (channels, self.opt.width, self.opt.height) # this we will have to check
+            input_shape = (1, self.opt.width, self.opt.height) # this we will have to check
             self.Discriminator = networks.Discriminator(input_shape)
+            self.Discriminator.to(self.device)
             
+            # Adversarial ground truths
+            #  valid = Variable(Tensor(np.ones((real_A.size(0), *D_A2.output_shape))), requires_grad=False)
+            self.valid = torch.ones((1, *self.Discriminator.output_shape), requires_grad=False).repeat([self.opt.batch_size, 1, 1, 1]).to(self.device)
+            self.fake = torch.zeros((1, *self.Discriminator.output_shape), requires_grad=False).repeat([self.opt.batch_size, 1, 1, 1]).to(self.device)
+                 
             # self.criterion_Discriminator = FrechetInceptionDistance(feature=64)
             self.criterion_Discriminator = torch.nn.MSELoss()
         
             self.optimizer_Discriminator = torch.optim.Adam(self.Discriminator.parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
             
-            self.disc_model_lr_scheduler = optim.lr_scheduler.StepLR(self.model_optimizer, self.opt.scheduler_step_size, 0.1)
+            # self.disc_model_lr_scheduler = optim.lr_scheduler.StepLR(self.optimizer_Discriminator, self.opt.scheduler_step_size, 0.1)
             
             
             # loss_real = criterion_GAN(Discriminator(real_A), valid)
@@ -195,16 +199,12 @@ class Trainer:
         # datasets_dict = {"kitti": datasets.KITTIRAWDataset,
         #                  "kitti_odom": datasets.KITTIOdomDataset}
 
-        
-        
         datasets_dict = {"endovis": datasets.LungRAWDataset}
 
         self.dataset = datasets_dict[self.opt.dataset]
 
         fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom.txt")
 
-        
-        
         train_filenames = readlines(fpath.format("train"))[self.sampling_frequency:-self.sampling_frequency] # exclude frame accordingly
         val_filenames = readlines(fpath.format("val"))[self.sampling_frequency:-self.sampling_frequency]
         
@@ -215,7 +215,7 @@ class Trainer:
 
         train_dataset = self.dataset(
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext)
+            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2271)
         
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
@@ -227,7 +227,7 @@ class Trainer:
         
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext)
+            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0)
         
         # self.val_loader = DataLoader(
         #     val_dataset, self.opt.batch_size, True,
@@ -268,7 +268,6 @@ class Trainer:
         self.save_opts()
 
     
-        
     def set_train(self):
         """Convert all models to training mode
         """
@@ -312,8 +311,9 @@ class Trainer:
             losses["loss"].backward()
             self.model_optimizer.step()
             
+            
             if self.opt.adversarial_prior:
-                self.discriminator_train_step(inputs)
+                self.discriminator_train_step(inputs,outputs)
             
                 # loss_real = criterion_GAN(Discriminator(real_A), valid)
             # # Fake loss (on batch of previously generated samples)
@@ -349,33 +349,24 @@ class Trainer:
 
     def discriminator_train_step(self, inputs, outputs):
         
-        for key, ipt in inputs.items():
-            inputs[key] = ipt.to(self.device)
+        # for key, ipt in inputs.items():
+        #     inputs[key] = ipt.to(self.device)
             
         # backpropagate through discriminator
-            self.optimizer_Discriminator.zero_grad()
+        self.Discriminator.train()
+        self.optimizer_Discriminator.zero_grad()
 
             # Real loss
-            CT_depth = ''
-            loss_real = self.criterion_Discriminator(self.Discriminator(CT_depth), self.valid)
+        loss_real = self.criterion_Discriminator(self.Discriminator(inputs[('ct_prior', 0)]), self.valid)
+            
+        loss_fake = self.criterion_Discriminator(self.Discriminator(outputs[("depth", 0, 0)].detach()), self.fake)
+        # Total loss
+        loss_D = (loss_real + loss_fake) / 2
 
-            # Fake loss (on batch of previously generated samples)
-            # output of depth network
-            #  make sure that weights are not propagated here
-            # features_gan = self.models["encoder"](inputs["color_aug", 0, 0])
-            # outputs_gan = self.models["depth"](features_gan)
-            
-            # do I need to calculate this again 
-            features_gan = self.models["encoder"](inputs["color_aug", 0, 0])
-            outputs_gan = self.models["depth"](features_gan)
-            
-            loss_fake = self.criterion_Discriminator(self.Discriminator(outputs_gan.detach()), self.fake)
-            # Total loss
-            loss_D = (loss_real + loss_fake) / 2
-
-            loss_D.backward()
-            self.optimizer_Discriminator.step()
-            
+        loss_D.backward()
+        self.optimizer_Discriminator.step()
+        
+        self.Discriminator.eval()
             
             
         
@@ -402,11 +393,7 @@ class Trainer:
             features = self.models["encoder"](inputs["color_aug", 0, 0])
             outputs = self.models["depth"](features)
 
-        if self.opt.adversarial_prior: 
-                # how close depth network is to creating the original looking images 
-            outputs["discriminator_out"] = self.Discriminator(outputs)
-            
-                
+   
         if self.opt.predictive_mask:
             outputs["predictive_mask"] = self.models["predictive_mask"](features)
 
@@ -577,11 +564,13 @@ class Trainer:
         losses = {}
         total_loss = 0
         gan_loss = 0 
-
+        disc_loss = 0 
         gan_loss_total = 0 
         if self.opt.adversarial_prior:
             # how far is the model from valid examples 
-            loss_real = self.criterion_Discriminator(outputs['discriminator_out'], self.valid)
+            self.Discriminator.eval()
+            disc_loss = self.criterion_Discriminator(self.Discriminator(outputs[("depth", 0, 0)]), self.valid)
+            losses["depth_loss/{}".format(0)] = disc_loss
             
                 
         if self.opt.pre_trained_generator:
@@ -704,7 +693,7 @@ class Trainer:
             losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
-        losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002
+        losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.2 * disc_loss
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):
