@@ -11,17 +11,17 @@ class UNet(nn.Module):
         self.bilinear = bilinear
 
         self.base_filter = 16
-        self.inc = (DoubleConv(n_channels, 64))
-        self.down1 = (Down(64, 128))
-        self.down2 = (Down(128, 256))
-        self.down3 = (Down(256, 512))
+        self.inc = (DoubleConv(n_channels, self.base_filter))
+        self.down1 = (Down(self.base_filter, self.base_filter*2)) # self.base_filter, self.base_filter*2
+        self.down2 = (Down(self.base_filter*2, self.base_filter*4))# self.base_filter*2, self.base_filter*4
+        self.down3 = (Down(self.base_filter*4, self.base_filter*8))# self.base_filter*4, # self.base_filter*8
         factor = 2 if bilinear else 1
-        self.down4 = (Down(512, 1024 // factor))
-        self.up1 = (Up(1024, 512 // factor, bilinear))
-        self.up2 = (Up(512, 256 // factor, bilinear))
-        self.up3 = (Up(256, 128 // factor, bilinear))
-        self.up4 = (Up(128, 64, bilinear))
-        self.outc = (OutConv(64, n_classes))
+        self.down4 = (Down(self.base_filter*8, self.base_filter*16 // factor)) # self.base_filter*8, self.base_filter*16
+        self.up1 = (Up(self.base_filter*16, self.base_filter*8 // factor, bilinear))# self.base_filter*16, self.base_filter*8
+        self.up2 = (Up(self.base_filter*8, self.base_filter*4 // factor, bilinear))# self.base_filter*8, self.base_filter*4
+        self.up3 = (Up(self.base_filter*4, self.base_filter*2// factor, bilinear))# self.base_filter*4, self.base_filter*2
+        self.up4 = (Up(self.base_filter*2, self.base_filter*1, bilinear)) # self.base_filter*2, self.base_filter*1
+        self.outc = (OutConv(self.base_filter, n_classes))
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):

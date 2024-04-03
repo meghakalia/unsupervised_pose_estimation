@@ -9,10 +9,11 @@ class Flatten(torch.nn.Module):
     
 class FCN(nn.Module):
     
-    def __init__(self, input_size, output_size = 1):
+    def __init__(self, output_size = 1):
         super(FCN, self).__init__()
 
         self.flatten = Flatten()
+        self.ouput_size = output_size
         
         
     def forward(self, x):
@@ -36,7 +37,7 @@ class FCN(nn.Module):
         x = nn.ReLU().to('cuda')(x)
         
         x = nn.Linear(x.shape[-1], 1).to('cuda')(x)
-        x = nn.Linear(x.shape[0], 1).to('cuda')(x.transpose(0,1))
+        x = nn.Linear(x.shape[0], self.ouput_size).to('cuda')(x.transpose(0,1))
         x = nn.Sigmoid().to('cuda')(x)
         
         return x

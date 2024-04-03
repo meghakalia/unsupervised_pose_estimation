@@ -108,7 +108,7 @@ def load_model_fxn(load_weights_folder, models_to_load, models):
 # save optim 
 # load model 
 file_dir = os.path.dirname(__file__)  # the directory that options.py resides in
-load_model = True 
+load_model = False 
 # data loader
 models = {}
 input_size = ()
@@ -116,6 +116,8 @@ learning_rate = 10e-06
 batch_size = 16
 num_epochs = 20
 parameters_to_train = []
+train_unet_only = True
+experiment_name = "unet_pretrain"
 
 # variables
 data_path         = os.path.join(file_dir, "data")
@@ -126,6 +128,9 @@ adversarial_prior = False
 device            = torch.device("cuda")
 n_channels        = 3
 n_classes         = 3
+scheduler_step_size = 8
+bool_multi_gauss = False
+same_gauss_kernel = True
 
 # wandb 
 config = dict(
@@ -134,34 +139,41 @@ config = dict(
     epochs=num_epochs,
     batch_size=batch_size,
     learning_rate=learning_rate,
-    dataset="only_unet_training",
+    dataset=experiment_name,
     frame_ids = frame_ids,
     augmentation = "True",
-    align_corner="True")
+    align_corner="True", 
+    pretrained_unet_model = load_model, 
+    multi_gauss = bool_multi_gauss, 
+    same_gauss_assumption = same_gauss_kernel)
         
 wandb.login()
-wandb.init(project="gaussian_test", config= config, dir = 'data/logs')
+wandb.init(project="gaussian_test", config= config, dir = 'data/logs', name = experiment_name )
 
 models['decompose'] = networks.UNet(n_channels, n_classes) 
-models['gaussian'] = networks.GaussianLayer(height) 
-models['sigma'] = networks.FCN(1024) 
+if not train_unet_only: 
+    models['gaussian'] = networks.GaussianLayer(height) 
+    if bool_multi_gauss:
+        models['sigma'] = networks.FCN(output_size = 5) 
 
 if load_model:
     load_model_fxn('code/logs/models/weights_0', ["decompose"], models)
     
-
-
-
 models['decompose'].to(device)
-models['sigma'].to(device)
-models['gaussian'].to(device)
+
+if not train_unet_only:   
+    models['sigma'].to(device)
+    models['gaussian'].to(device)
 
 parameters_to_train += list(models["decompose"].parameters())
-parameters_to_train += list(models["gaussian"].parameters())
-parameters_to_train += list(models["sigma"].parameters())
+
+if not train_unet_only:   
+    parameters_to_train += list(models["gaussian"].parameters())
+    parameters_to_train += list(models["sigma"].parameters())
 
 # optimizer
 model_optimizer = optim.Adam(parameters_to_train, learning_rate)
+model_lr_scheduler = optim.lr_scheduler.StepLR(model_optimizer, scheduler_step_size, 0.1)
 
 # dataloader 
 datasets_dict = {"endovis": datasets.LungRAWDataset}
@@ -179,18 +191,17 @@ num_total_steps = num_train_samples // batch_size * num_epochs
 train_dataset =  dataset(
      data_path, train_filenames,  height,  width,
      frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior =  adversarial_prior, len_ct_depth_data = 2271)
-train_loader = DataLoader(train_dataset, batch_size, True, drop_last=True)
+train_loader = DataLoader(train_dataset, batch_size, shuffle = True, drop_last=True)
     
 val_dataset = dataset(data_path, val_filenames,  height,  width,frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0) 
-val_loader = DataLoader(val_dataset,  batch_size, True, drop_last=True)
+val_loader = DataLoader(val_dataset,  batch_size, shuffle = True, drop_last=True)
 val_iter = iter( val_loader)
 
-
-
-
 models['decompose'].to(device)
-models['gaussian'].to(device)
-models['sigma'].to(device)
+
+if not train_unet_only:   
+    models['gaussian'].to(device)
+    models['sigma'].to(device)
 
 # wandb model watch 
 # for key, model in models.items():
@@ -208,16 +219,20 @@ start_time = time.time()
 step = 1
 save_frequency = 50
 custom_step = 0
+prev_error = 100000000
 for  epoch in range(num_epochs):
     print("Training")
-    models['decompose'].train()
-    # models['gaussian'].train()
-    # models['sigma'].train()
     
     custom_step+=1
     outputs = {}
+    
     for batch_idx, inputs in enumerate(train_loader):
-
+        
+        models['decompose'].train()
+        if not train_unet_only: 
+            models['gaussian'].train()
+            models['sigma'].train()
+    
         for key, ipt in inputs.items():
             inputs[key] = ipt.to(device)
             
@@ -225,13 +240,27 @@ for  epoch in range(num_epochs):
 
         features                = models["decompose"](inputs["color_aug", 0, 0])
         outputs['decompose']    = features[1]
-        sigma_out               = models['sigma'](features[0]) # check the dimension. pass through the convolutions. Input in the gaussian network 
-        gaussian_mask           = models["gaussian"](sigma_out)
         
-        outputs['compose'] = outputs['decompose'] * gaussian_mask.repeat(16,1,1,1)
-        # outputs['compose'] = outputs['decompose']
-        
-        
+        if not train_unet_only:
+            sigma_out               = models['sigma'](features[0]) # will spit out 5, 1 gaussian std 
+            gaussian_mask           = models["gaussian"](sigma_out) 
+            
+            if not bool_multi_gauss:
+                if same_gauss_kernel:
+                    outputs['compose'] = outputs['decompose'] * gaussian_mask.repeat(16,1,1,1)
+                else:
+                    outputs['compose'] = outputs['decompose'] * gaussian_mask
+            # else:
+            #     if same_gauss_kernel:
+            #         # output of gauss should be : 5 x 1
+            #         gaussian_mask = gaussian_mask
+            #     else:
+            #         # output of gauss should be : 16 x 5
+                
+                
+        else:
+            outputs['compose'] = outputs['decompose']
+
         losses = compute_reprojection_loss(outputs['compose'], inputs["color_aug", 0, 0])
         
         model_optimizer.zero_grad()
@@ -242,29 +271,41 @@ for  epoch in range(num_epochs):
         
         step+=1
         
+        # save model
+        if losses['reprojection_loss'] < prev_error: 
+            # save_model 
+            save_model(epoch, 'code/{}'.format(experiment_name), models, model_optimizer)
+            prev_error = losses['reprojection_loss']
+        
         # wand_b loggin 
         if ( step + 1) %  save_frequency == 0:
-            
-            
+   
             models['decompose'].eval()
-            models['sigma'].eval()
-            models['gaussian'].eval()
+            if not train_unet_only: 
+                models['sigma'].eval()
+                models['gaussian'].eval()
             
             # features_val = models["decompose"](inputs["color_aug", 0, 0][0][None, :, :, :])
-            features_val = models["decompose"](inputs["color_aug", 0, 0])
-            image        = features_val[1]
-            sigma_out_val               = models['sigma'](features_val[0]) # check the dimension. pass through the convolutions. Input in the gaussian network 
-            gaussian_mask_val           = models["gaussian"](sigma_out_val)
-            final_val = image*gaussian_mask_val.repeat(16,1,1,1)
+            features_val        = models["decompose"](inputs["color_aug", 0, 0])
+            image               = features_val[1]
+            if not train_unet_only: 
+                sigma_out_val       = models['sigma'](features_val[0]) # check the dimension. pass through the convolutions. Input in the gaussian network 
+                gaussian_mask_val   = models["gaussian"](sigma_out_val)
+                final_val           = image*gaussian_mask_val.repeat(16,1,1,1)
             
-            wandb.log({"{}".format('train_gaussmask'):wandb.Image(make_grid(gaussian_mask_val), caption = 'gaussian mask'),'custom_step':custom_step})  
             wandb.log({"{}".format('train_original'):wandb.Image(inputs["color_aug", 0, 0], caption ='original image'),'custom_step':custom_step})  
-            wandb.log({"{}".format('train_reconstructed'):wandb.Image(make_grid(final_val), caption = 'reconstructed image'),'custom_step':custom_step})  
             wandb.log({"{}".format('train_intermediate'):wandb.Image(make_grid(image), caption = 'intermediate image'),'custom_step':custom_step})  
             
+            if not train_unet_only: 
+                wandb.log({"{}".format('train_reconstructed'):wandb.Image(make_grid(final_val), caption = 'reconstructed image'),'custom_step':custom_step})  
+                wandb.log({"{}".format('train_gaussmask'):wandb.Image(make_grid(gaussian_mask_val), caption = 'gaussian mask'),'custom_step':custom_step})       
+                
+            
+            wandb.log({"{}".format('learning_rate'):model_lr_scheduler.optimizer.param_groups[0]['lr'],'custom_step':custom_step})
             for l, v in losses.items():
                 wandb.log({"{}_{}".format('train', l):v, 'custom_step':custom_step})
-    
+                
+    model_lr_scheduler.step()
     #save model
     # save_model(epoch, 'code/logs', models, model_optimizer)
     
