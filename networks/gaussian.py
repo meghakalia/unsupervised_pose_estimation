@@ -16,7 +16,7 @@ class GaussianLayer(nn.Module):
         self.input_size = input_size
         self.num_of_gaussians = num_of_gaussians
         self.proportions_rand = torch.rand(self.num_of_gaussians)
-        self.proportions = nn.Parameter(torch.rand(self.num_of_gaussians/torch.sum(self.proportions_rand)))
+        self.proportions = nn.Parameter(self.proportions_rand/torch.sum(self.proportions_rand))
         # self.sigma = nn.Parameter(torch.rand(1))
         # self.gauss_layer  = gkern(input_size, self.sigma)
    
@@ -42,19 +42,22 @@ class GaussianLayer(nn.Module):
         return 
     
     def forward(self, sigmas):
+        final_out = []
         if self.num_of_gaussians==1:
             output  = [self.gkern(self.input_size, sigmas[i])[None, :, :, :] for i in range(sigmas.shape[0])]  
         else:
-            # untested
+            # untested, if gaussian are more than 1 
             output = []
             for i in range(sigmas.shape[0]):             
                 output_temp = self.proportions[0]*self.gkern(self.input_size, sigmas[i][0])
-                for j in range(1, sigmas.shape[0]):
-                    output_temp += output_temp*self.proportions[j]
+                for j in range(1, sigmas.shape[-1]):
+                    output_temp += self.proportions[j]*self.gkern(self.input_size, sigmas[i][j])
                 
-                output = output.append(output_temp[None, :, :, :])
- 
-        return torch.concat(output)
+                output+= [output_temp[None, :, :, :]]
+
+        final_out.append(torch.concat(output))
+        final_out.append(self.proportions)
+        return final_out
 
     # def weights_init(self):
     #     n= np.zeros((21,21))

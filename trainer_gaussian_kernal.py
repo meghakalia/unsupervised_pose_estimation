@@ -36,8 +36,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+# 0.25 - 0.95
 # losses 
-def compute_reprojection_loss(pred, target):
+def compute_reprojection_loss(pred, target, frac = 0.45):
     """Computes reprojection loss between a batch of predicted and target images
     """
     losses = {}
@@ -46,11 +47,14 @@ def compute_reprojection_loss(pred, target):
     
 
     ssim_loss = ssim(pred, target).mean(1).mean(-1).mean(-1)
-    reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
+    reprojection_loss = (1.0 - frac)* ssim_loss + frac * l1_loss
+    
+    # reprojection_loss = l1_loss
     
     losses['l1'] = l1_loss.mean(-1)
-    losses['ssim_loss'] = ssim_loss.mean(-1)
+    # losses['ssim_loss'] = 0
     losses['reprojection_loss'] = reprojection_loss.mean(-1)
+    losses['ssim_loss'] = ssim_loss.mean(-1)
     
     return losses
 
@@ -107,8 +111,12 @@ def load_model_fxn(load_weights_folder, models_to_load, models):
 # save model
 # save optim 
 # load model 
+
+
+# frac = 0.25 + f*0.10
+frac = 0.45
 file_dir = os.path.dirname(__file__)  # the directory that options.py resides in
-load_model = False 
+load_model = True 
 # data loader
 models = {}
 input_size = ()
@@ -116,8 +124,8 @@ learning_rate = 10e-06
 batch_size = 16
 num_epochs = 20
 parameters_to_train = []
-train_unet_only = True
-experiment_name = "unet_pretrain"
+train_unet_only = False
+
 
 # variables
 data_path         = os.path.join(file_dir, "data")
@@ -129,9 +137,10 @@ device            = torch.device("cuda")
 n_channels        = 3
 n_classes         = 3
 scheduler_step_size = 8
-bool_multi_gauss = False
-same_gauss_kernel = True
+bool_multi_gauss = True
+same_gauss_kernel = False # if all images have same gaussian profile
 
+experiment_name = "pretrained_unet_32_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}".format(frac, bool_multi_gauss, same_gauss_kernel)
 # wandb 
 config = dict(
     height = height,
@@ -152,12 +161,17 @@ wandb.init(project="gaussian_test", config= config, dir = 'data/logs', name = ex
 
 models['decompose'] = networks.UNet(n_channels, n_classes) 
 if not train_unet_only: 
-    models['gaussian'] = networks.GaussianLayer(height) 
+    
+    
     if bool_multi_gauss:
         models['sigma'] = networks.FCN(output_size = 5) 
+        models['gaussian'] = networks.GaussianLayer(height, num_of_gaussians = 5)
+    else:
+        models['sigma'] = networks.FCN()
+        models['gaussian'] = networks.GaussianLayer(height)
 
 if load_model:
-    load_model_fxn('code/logs/models/weights_0', ["decompose"], models)
+    load_model_fxn('code/train_unet_32_ssim_l1_0.45/models/weights_7', ["decompose"], models)
     
 models['decompose'].to(device)
 
@@ -189,8 +203,8 @@ num_train_samples = len(train_filenames)
 num_total_steps = num_train_samples // batch_size * num_epochs
 
 train_dataset =  dataset(
-     data_path, train_filenames,  height,  width,
-     frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior =  adversarial_prior, len_ct_depth_data = 2271)
+    data_path, train_filenames,  height,  width,
+    frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior =  adversarial_prior, len_ct_depth_data = 2271)
 train_loader = DataLoader(train_dataset, batch_size, shuffle = True, drop_last=True)
     
 val_dataset = dataset(data_path, val_filenames,  height,  width,frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0) 
@@ -243,25 +257,25 @@ for  epoch in range(num_epochs):
         
         if not train_unet_only:
             sigma_out               = models['sigma'](features[0]) # will spit out 5, 1 gaussian std 
-            gaussian_mask           = models["gaussian"](sigma_out) 
+            gaussian_mask           = models["gaussian"](sigma_out)
             
             if not bool_multi_gauss:
                 if same_gauss_kernel:
-                    outputs['compose'] = outputs['decompose'] * gaussian_mask.repeat(16,1,1,1)
+                    outputs['compose'] = outputs['decompose'] * gaussian_mask[0].repeat(16,1,1,1)
                 else:
-                    outputs['compose'] = outputs['decompose'] * gaussian_mask
-            # else:
-            #     if same_gauss_kernel:
-            #         # output of gauss should be : 5 x 1
-            #         gaussian_mask = gaussian_mask
-            #     else:
-            #         # output of gauss should be : 16 x 5
+                    outputs['compose'] = outputs['decompose'] * gaussian_mask[0]
+            else:
+                if same_gauss_kernel:
+                    # output of gauss should be : 5 x 1
+                    outputs['compose'] = outputs['decompose'] * gaussian_mask[0].repeat(16,1,1,1)
+                else:
+                    outputs['compose'] = outputs['decompose'] * gaussian_mask[0]
                 
                 
         else:
             outputs['compose'] = outputs['decompose']
 
-        losses = compute_reprojection_loss(outputs['compose'], inputs["color_aug", 0, 0])
+        losses = compute_reprojection_loss(outputs['compose'], inputs["color_aug", 0, 0], frac)
         
         model_optimizer.zero_grad()
         losses['reprojection_loss'].backward()
@@ -279,7 +293,7 @@ for  epoch in range(num_epochs):
         
         # wand_b loggin 
         if ( step + 1) %  save_frequency == 0:
-   
+
             models['decompose'].eval()
             if not train_unet_only: 
                 models['sigma'].eval()
@@ -291,14 +305,18 @@ for  epoch in range(num_epochs):
             if not train_unet_only: 
                 sigma_out_val       = models['sigma'](features_val[0]) # check the dimension. pass through the convolutions. Input in the gaussian network 
                 gaussian_mask_val   = models["gaussian"](sigma_out_val)
-                final_val           = image*gaussian_mask_val.repeat(16,1,1,1)
+                final_val           = image*gaussian_mask_val[0].repeat(16,1,1,1)
+                
+                print('val')
+                print(gaussian_mask_val[1])
+                print(sigma_out_val)
             
             wandb.log({"{}".format('train_original'):wandb.Image(inputs["color_aug", 0, 0], caption ='original image'),'custom_step':custom_step})  
             wandb.log({"{}".format('train_intermediate'):wandb.Image(make_grid(image), caption = 'intermediate image'),'custom_step':custom_step})  
             
             if not train_unet_only: 
                 wandb.log({"{}".format('train_reconstructed'):wandb.Image(make_grid(final_val), caption = 'reconstructed image'),'custom_step':custom_step})  
-                wandb.log({"{}".format('train_gaussmask'):wandb.Image(make_grid(gaussian_mask_val), caption = 'gaussian mask'),'custom_step':custom_step})       
+                wandb.log({"{}".format('train_gaussmask'):wandb.Image(make_grid(gaussian_mask_val[0]), caption = 'gaussian mask'),'custom_step':custom_step})       
                 
             
             wandb.log({"{}".format('learning_rate'):model_lr_scheduler.optimizer.param_groups[0]['lr'],'custom_step':custom_step})
@@ -309,6 +327,6 @@ for  epoch in range(num_epochs):
     #save model
     # save_model(epoch, 'code/logs', models, model_optimizer)
     
-        
+wandb.finish()
     
     

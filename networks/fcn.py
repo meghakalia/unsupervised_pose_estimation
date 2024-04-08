@@ -20,14 +20,17 @@ class FCN(nn.Module):
         x = nn.Conv2d(x.shape[1], x.shape[1]//2, 3, padding = 'valid').to('cuda')(x)
         x = nn.BatchNorm2d(x.shape[1]).to('cuda')(x)
         x = nn.ReLU().to('cuda')(x)
+        x = nn.Dropout(0.2).to('cuda')(x)
         
         x = nn.Conv2d(x.shape[1], x.shape[1]//2, 3, padding = 'valid').to('cuda')(x)
         x = nn.BatchNorm2d(x.shape[1]).to('cuda')(x)
         x = nn.ReLU().to('cuda')(x)
+        x = nn.Dropout(0.2).to('cuda')(x)
         
         x = nn.Conv2d(x.shape[1], x.shape[1]//2, 3, padding = 'valid').to('cuda')(x)
         x = nn.BatchNorm2d(x.shape[1]).to('cuda')(x)
         x = nn.ReLU().to('cuda')(x)
+        x = nn.Dropout(0.2).to('cuda')(x)
         
         x = self.flatten(x)
         x = nn.Linear(x.shape[-1], x.shape[-1]//2).to('cuda')(x)

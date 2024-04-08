@@ -46,7 +46,7 @@ class MonodepthOptions:
         self.parser.add_argument("--num_layers",
                                  type=int,
                                  help="number of resnet layers",
-                                 default=18,
+                                 default=34,
                                  choices=[18, 34, 50, 101, 152])
         self.parser.add_argument("--dataset",
                                  type=str,
