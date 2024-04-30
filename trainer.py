@@ -36,6 +36,7 @@ import wandb_logging
 
 import torchvision.transforms as transforms
 
+from evaluate_pose import plotTrajectory, dump_xyz, dump_r, compute_ate, compute_re
 # from torchviz import make_dot
 
 class Trainer:
@@ -203,19 +204,24 @@ class Trainer:
 
         self.dataset = datasets_dict[self.opt.dataset]
 
-        fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom.txt")
+        fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
+        
+        train_filenames = readlines(fpath.format("train")) # exclude frame accordingly
+        val_filenames = readlines(fpath.format("val"))
 
-        train_filenames = readlines(fpath.format("train"))[self.sampling_frequency:-self.sampling_frequency] # exclude frame accordingly
-        val_filenames = readlines(fpath.format("val"))[self.sampling_frequency:-self.sampling_frequency]
+        # train_filenames = readlines(fpath.format("train"))[self.sampling_frequency+2:-self.sampling_frequency-6] # exclude frame accordingly
+        # val_filenames = readlines(fpath.format("val"))[self.sampling_frequency+2:-self.sampling_frequency-6]
+        
         
         img_ext = '.png'
 
+        
         num_train_samples = len(train_filenames)
         self.num_total_steps = num_train_samples // self.opt.batch_size * self.opt.num_epochs
 
         train_dataset = self.dataset(
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2271)
+            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2271, sampling_frequency = self.sampling_frequency )
         
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
@@ -227,7 +233,7 @@ class Trainer:
         
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0)
+            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0, sampling_frequency = 2)
         
         # self.val_loader = DataLoader(
         #     val_dataset, self.opt.batch_size, True,
@@ -238,6 +244,40 @@ class Trainer:
         
         self.val_iter = iter(self.val_loader)
 
+        # for pose trajectory
+        if self.opt.eval_pose_trajectory:
+            
+            fpath_trajectory = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "test_files_phantom_{}.txt")
+            fpath_gt = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "gt_poses_phantom_{}.npz")
+            
+            # for trajectory plot add trajectory 1 and 14 
+            val_traj_14_filenames = readlines(fpath_trajectory.format("14"))[0:50] # not used in training 
+            val_traj_1_filenames  = readlines(fpath_trajectory.format("1"))[0:50] # used in training
+            
+            
+            val_trajectory_14_dataset = self.dataset(
+            self.opt.data_path, val_traj_14_filenames, self.opt.height, self.opt.width,
+            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0)
+        
+            val_trajectory_1_dataset = self.dataset(
+                self.opt.data_path, val_traj_1_filenames, self.opt.height, self.opt.width,
+                self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0)
+            
+            self.val_traj_14_loader = DataLoader(
+                val_trajectory_14_dataset, self.opt.batch_size, True, drop_last=True)
+            
+            self.val_traj_1_loader = DataLoader(
+                val_trajectory_1_dataset, self.opt.batch_size, True, drop_last=True)
+            
+            # self.val_iter_1_traj = iter(self.val_traj_1_loader)
+            # self.val_iter_14_traj = iter(self.val_traj_14_loader)
+
+            
+            # gt poses 
+            self.gt_local_poses_14 = np.load(fpath_gt.format("14"), fix_imports=True, encoding='latin1')["data"]
+            self.gt_local_poses_1 = np.load(fpath_gt.format("1"), fix_imports=True, encoding='latin1')["data"]
+            
+        
         # self.writers = {}
         # for mode in ["train", "val"]:
         #     self.writers[mode] = SummaryWriter(os.path.join(self.log_path, mode))
@@ -289,6 +329,11 @@ class Trainer:
         self.start_time = time.time()
         for self.epoch in range(self.opt.num_epochs):
             self.run_epoch()
+            
+            if self.opt.eval_pose_trajectory:
+                traj_outputs, traj_losses = self.get_trajectory_error(self.val_traj_14_loader, self.gt_local_poses_14)
+                self.log_wand("val2", traj_outputs, traj_losses, self.wanb_obj, step = self.epoch, character="trajectory")
+            
             if (self.epoch + 1) % self.opt.save_frequency == 0:
                 self.save_model()
         self.wanb_obj.finishWandb()
@@ -369,7 +414,71 @@ class Trainer:
         self.Discriminator.eval()
             
             
+    def get_trajectory_error(self, dataloader, gt_poses):
         
+        self.set_eval()
+        # get prediction of trajectory 
+        outputs = {'trajectory':0}
+        losses = {'mean_ates':0, 'std_ates':0, 'mean_res':0,'std_res':0 }
+        
+       
+        # if self.opt.eval_pose_trajectory:
+        pred_poses = []
+        with torch.no_grad():
+            for inputs in dataloader:
+        
+                # count = count + 1
+                # print(count)
+                for key, ipt in inputs.items():
+                    inputs[key] = ipt.cuda()
+
+                # transforms.ToPILImage()(inputs[("color", 1, 0)].cpu().squeeze()).save('trainer_2_1.png')
+                
+                all_color_aug = torch.cat([inputs[("color", 1, 0)], inputs[("color", 0, 0)]], 1)
+
+                # save image here all color_aug channel 0 and channel 1
+                features = [self.models["pose_encoder"](all_color_aug)]
+                axisangle, translation = self.models["pose"](features)
+
+                pred_poses.append(
+                    transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().numpy())
+                
+        # predict errors            
+        pred_poses = np.concatenate(pred_poses)
+        
+        outputs['trajectory'] = plotTrajectory(pred_poses, gt_poses)
+        
+        ates = []
+        res = []
+        # num_frames = gt_local_poses.shape[0]
+        num_frames = pred_poses.shape[0] - 3
+        track_length = 5
+        
+        
+        for i in range(0, num_frames - 1):
+            local_xyzs = np.array(dump_xyz(pred_poses[i:i + track_length - 1]))
+            gt_local_xyzs = np.array(dump_xyz(gt_poses[i:i + track_length - 1]))
+            local_rs = np.array(dump_r(pred_poses[i:i + track_length - 1]))
+            gt_rs = np.array(dump_r(gt_poses[i:i + track_length - 1]))
+            # if i + track_length - 1 > 50:
+            #     print('here')
+            # print(i + track_length - 1)
+
+            ates.append(compute_ate(gt_local_xyzs, local_xyzs))
+            res.append(compute_re(local_rs, gt_rs))
+
+        # log this to wandb based on the 
+        mean_ates, std_ates = np.mean(ates), np.std(ates)
+        mean_res, std_res   = np.mean(res), np.std(res)
+        losses['mean_ates'] = mean_ates
+        losses['std_ates']  = std_ates
+        losses['mean_res']  = mean_res
+        losses['std_res']   = std_res
+        
+        self.set_train()
+        
+        return outputs, losses
+    
     def process_batch(self, inputs):
         """Pass a minibatch through the network and generate images and losses
         """
@@ -478,6 +587,16 @@ class Trainer:
 
         with torch.no_grad():
             outputs, losses = self.process_batch(inputs)
+            
+            # run on trajectory for pose
+            # get pose prediction. 
+            # calculate errors on 2 trajectories. 
+            # calculate error on GT yaw and pitch relative 
+            # plot trajectories wrt to GT EM tracker data
+           
+            if self.opt.eval_pose_trajectory:
+                traj_outputs_train, traj_losses_train = self.get_trajectory_error(self.val_traj_1_loader, self.gt_local_poses_1)
+                self.log_wand("train_val", traj_outputs_train, traj_losses_train, self.wanb_obj, step = self.epoch, character="trajectory")
 
             if "depth_gt" in inputs:
                 self.compute_depth_losses(inputs, outputs, losses)

@@ -45,7 +45,7 @@ class MonoDataset(data.Dataset):
                  len_ct_depth_data, 
                  is_train=False,
                  img_ext='.png', 
-                 sampling_frequency = 1, 
+                 sampling_frequency = 2, 
                  adversarial_prior = False, 
                  data_augment = True
                  ):
@@ -164,6 +164,10 @@ class MonoDataset(data.Dataset):
             2       images resized to (self.width // 4, self.height // 4)
             3       images resized to (self.width // 8, self.height // 8)
         """
+        
+        # sample random number between 1 to the sampling frequency inclusive. 
+        curr_sampling_rate = np.random.randint(1, self.sampling_frequency, size=1)[0]
+        
         inputs = {}
 
         if self.adversarial_prior:
@@ -193,7 +197,7 @@ class MonoDataset(data.Dataset):
                 other_side = {"r": "l", "l": "r"}[side]
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
             else:
-                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(self.sampling_frequency - 1), side, do_flip)
+                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip)
 
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):

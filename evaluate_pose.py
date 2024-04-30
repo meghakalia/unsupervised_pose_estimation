@@ -13,6 +13,20 @@ from datasets import LungRAWDataset
 
 import matplotlib.pyplot as plt
 
+def sample_filenames_frequency(filenames, sampling_frequency):
+    outputfilenames = []
+    count = 0
+    outputfilenames.append(filenames[0])
+    for file in filenames:
+        
+        if count == sampling_frequency:
+            outputfilenames.append(file)
+            count = 0 
+
+        count+=1
+    
+    return outputfilenames
+
 # from https://github.com/tinghuiz/SfMLearner
 def dump_xyz(source_to_target_transformations):
     xyzs = []
@@ -75,7 +89,7 @@ def compute_scale(gtruth, pred):
     scale = np.sum(gtruth[:, :3, 3] * pred[:, :3, 3]) / np.sum(pred[:, :3, 3] ** 2)
     return scale
 
-def plotTrajectory(pred_poses, gt_local_poses, save_fig = False):
+def plotTrajectory(pred_poses, gt_local_poses, save_fig = False, name = 0):
     our_local_poses = pred_poses
     # gt_local_poses_absolute = loadGTposes(our_path_gt)
     gt_local_poses = gt_local_poses[:len(pred_poses), :, :]
@@ -114,7 +128,7 @@ def plotTrajectory(pred_poses, gt_local_poses, save_fig = False):
     figure2, = ax.plot(points_our[:, 0, 0], points_our[:, 1, 0], points_our[:, 2, 0], c='g', linewidth=1.6)
 
     if save_fig:
-        plt.savefig('vo.png',dpi=600)
+        plt.savefig('{}.png'.format(name),dpi=600)
     
     return plt
     # plt.show()
@@ -139,99 +153,103 @@ def evaluate(opt):
     #     os.path.join(os.path.dirname(__file__), "splits", "scared",
     #                  "test_files_phantom14.txt"))[0:50]
     
-    filenames = readlines(
-        os.path.join(os.path.dirname(__file__), "splits", "endovis",
-                     "test_files_phantom14.txt"))
-
-    # dataset = SCAREDRAWDataset(opt.data_path, filenames, opt.height, opt.width,
-    #                            [0, 1], 4, is_train=False)
-    # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,
-    #                     num_workers=opt.num_workers, pin_memory=True, drop_last=False)
-    
-    dataset = LungRAWDataset(
-            opt.data_path, filenames, opt.height, opt.width,
-            [0, 1], 4, is_train=False)
-    
-    dataloader = DataLoader(dataset, 1, shuffle=False, drop_last=False, pin_memory=True)
-    
-    # check time that dataloader takes to load the samples
-    
-    # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,pin_memory=False, drop_last=False)
-    
-    pose_encoder_path = os.path.join(opt.load_weights_folder, "pose_encoder.pth")
-    pose_decoder_path = os.path.join(opt.load_weights_folder, "pose.pth")
-
-    pose_encoder = networks.ResnetEncoder(opt.num_layers, False, 2)
-    pose_encoder.load_state_dict(torch.load(pose_encoder_path))
-
-    pose_decoder = networks.PoseDecoder(pose_encoder.num_ch_enc, 1, 2)
-    pose_decoder.load_state_dict(torch.load(pose_decoder_path))
-
-    pose_encoder.cuda()
-    pose_encoder.eval()
-    pose_decoder.cuda()
-    pose_decoder.eval()
-
-    pred_poses = []
-
-    print("-> Computing pose predictions")
-
-    opt.frame_ids = [0, 1]  # pose network only takes two frames as input
-
-    count = 0 
-    axisangle_ = []
-    translation_ = []
-    with torch.no_grad():
-        for inputs in dataloader:
-            
-            # count = count + 1
-            # print(count)
-            for key, ipt in inputs.items():
-                inputs[key] = ipt.cuda()
-
-            all_color_aug = torch.cat([inputs[("color", 1, 0)], inputs[("color", 0, 0)]], 1)
-
-            features = [pose_encoder(all_color_aug)]
-            axisangle, translation = pose_decoder(features)
-            axisangle_.append(axisangle[:, 0].cpu().numpy())
-            translation_.append(translation[:, 0].cpu().numpy())
-
-            pred_poses.append(
-                transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().numpy())
-            
-    # if want to save
-    # np.savez('pose_prediction.npz', pred_poses)
-    pred_poses = np.concatenate(pred_poses)
-
-    gt_path = os.path.join(os.path.dirname(__file__), "splits", "scared", "gt_poses_sq2.npz")
-    gt_local_poses = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
-
-    ates = []
-    res = []
-    # num_frames = gt_local_poses.shape[0]
-    num_frames = pred_poses.shape[0] - 3
-    track_length = 5
-    count = 0 
-    for i in range(0, num_frames - 1):
-        local_xyzs = np.array(dump_xyz(pred_poses[i:i + track_length - 1]))
-        gt_local_xyzs = np.array(dump_xyz(gt_local_poses[i:i + track_length - 1]))
-        local_rs = np.array(dump_r(pred_poses[i:i + track_length - 1]))
-        gt_rs = np.array(dump_r(gt_local_poses[i:i + track_length - 1]))
-        # if i + track_length - 1 > 50:
-        #     print('here')
-        # print(i + track_length - 1)
-
-        ates.append(compute_ate(gt_local_xyzs, local_xyzs))
-        res.append(compute_re(local_rs, gt_rs))
+    # num = 11
+    for num in range(3, 15):
+        filenames_1 = readlines(
+            os.path.join(os.path.dirname(__file__), "splits", "endovis",
+                        "test_files_phantom_{}.txt".format(num)))
+        filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)
+        # dataset = SCAREDRAWDataset(opt.data_path, filenames, opt.height, opt.width,
+        #                            [0, 1], 4, is_train=False)
+        # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,
+        #                     num_workers=opt.num_workers, pin_memory=True, drop_last=False)
         
-    print("\n   Trajectory error: {:0.4f}, std: {:0.4f}\n".format(np.mean(ates), np.std(ates)))
-    print("\n   Rotation error: {:0.4f}, std: {:0.4f}\n".format(np.mean(res), np.std(res)))
+        dataset = LungRAWDataset(
+                opt.data_path, filenames, opt.height, opt.width,
+                [0, 1], 4, is_train=False, len_ct_depth_data = len(filenames), data_augment = False, sampling_frequency = 3)
+        
+        dataloader = DataLoader(dataset, 1, shuffle=False, drop_last=False, pin_memory=True)
+        
+        # check time that dataloader takes to load the samples
+        
+        # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,pin_memory=False, drop_last=False)
+        
+        pose_encoder_path = os.path.join(opt.load_weights_folder, "pose_encoder.pth")
+        pose_decoder_path = os.path.join(opt.load_weights_folder, "pose.pth")
+
+        pose_encoder = networks.ResnetEncoder(opt.num_layers, False, 2)
+        pose_encoder.load_state_dict(torch.load(pose_encoder_path))
+
+        pose_decoder = networks.PoseDecoder(pose_encoder.num_ch_enc, 1, 2)
+        pose_decoder.load_state_dict(torch.load(pose_decoder_path))
+
+        pose_encoder.cuda()
+        pose_encoder.eval()
+        pose_decoder.cuda()
+        pose_decoder.eval()
+
+        pred_poses = []
+
+        print("-> Computing pose predictions")
+
+        opt.frame_ids = [0, 1]  # pose network only takes two frames as input
+
+        count = 0 
+        axisangle_ = []
+        translation_ = []
+        with torch.no_grad():
+            for inputs in dataloader:
+                
+                # count = count + 1
+                # print(count)
+                for key, ipt in inputs.items():
+                    inputs[key] = ipt.cuda()
+
+                all_color_aug = torch.cat([inputs[("color", 1, 0)], inputs[("color", 0, 0)]], 1)
+
+                features = [pose_encoder(all_color_aug)]
+                axisangle, translation = pose_decoder(features)
+                # axisangle_.append(axisangle[:, 0].cpu().numpy())
+                # translation_.append(translation[:, 0].cpu().numpy())
+
+                pred_poses.append(
+                    transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().numpy())
+                
+        # if want to save
+        # np.savez('pose_prediction_{}.npz'.format(num), pred_poses)
+        # np.savez('axisangle_{}.npz'.format(num), axisangle_)
+        # np.savez('translation_{}.npz'.format(num), translation_)
+        pred_poses = np.concatenate(pred_poses)
+
+        gt_path = os.path.join(os.path.dirname(__file__), "splits", "endovis", "gt_poses_phantom_{}.npz".format(num))
+        gt_local_poses = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
+
+        plotTrajectory(pred_poses, gt_local_poses, True, name = num)
+    # ates = []
+    # res = []
+    # # num_frames = gt_local_poses.shape[0]
+    # num_frames = pred_poses.shape[0] - 3
+    # track_length = 5
+    # count = 0 
+    # for i in range(0, num_frames - 1):
+    #     local_xyzs = np.array(dump_xyz(pred_poses[i:i + track_length - 1]))
+    #     gt_local_xyzs = np.array(dump_xyz(gt_local_poses[i:i + track_length - 1]))
+    #     local_rs = np.array(dump_r(pred_poses[i:i + track_length - 1]))
+    #     gt_rs = np.array(dump_r(gt_local_poses[i:i + track_length - 1]))
+    #     # if i + track_length - 1 > 50:
+    #     #     print('here')
+    #     # print(i + track_length - 1)
+
+    #     ates.append(compute_ate(gt_local_xyzs, local_xyzs))
+    #     res.append(compute_re(local_rs, gt_rs))
+        
+    # print("\n   Trajectory error: {:0.4f}, std: {:0.4f}\n".format(np.mean(ates), np.std(ates)))
+    # print("\n   Rotation error: {:0.4f}, std: {:0.4f}\n".format(np.mean(res), np.std(res)))
 
     # get the error
     # save the image 
-    plotTrajectory(pred_poses, gt_local_poses, True)
-    
-    
+    # plotTrajectory(pred_poses, gt_local_poses, True, name = num)
+
 
 if __name__ == "__main__":
     options = MonodepthEvalOptions()

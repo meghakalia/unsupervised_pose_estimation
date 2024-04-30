@@ -42,7 +42,9 @@ class PoseCNN(nn.Module):
         out = self.pose_conv(out)
         out = out.mean(3).mean(2)
 
-        out = 0.01 * out.view(-1, self.num_input_frames - 1, 1, 6)
+        # out = 0.01 * out.view(-1, self.num_input_frames - 1, 1, 6) # original
+        
+        out = out.view(-1, self.num_input_frames - 1, 1, 6)
 
         axisangle = out[..., :3]
         translation = out[..., 3:]

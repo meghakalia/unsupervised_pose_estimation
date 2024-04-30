@@ -41,7 +41,7 @@ class wandb_logging:
         
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
-        wandb.init(project="drop_out_test", config=self.config, dir = 'data/logs')
+        wandb.init(project="scaled_depth_trajectory_plot", config=self.config, dir = 'data/logs')
         
         self.save_colored_depth = False
         
@@ -148,7 +148,11 @@ class wandb_logging:
                     self.log_image_grid(mode = mode, image_list = c, scale = s, caption = ' ', character = ''.join((character,"{}".format(s))), step = step)
                     
                     c_depth = torch.concat(image_list_depth, 0)
-                    self.log_image_grid(mode = mode, image_list = c_depth, scale = s, caption = 'depth_', character = ''.join((character,"{}".format(s))), step = step)
+                    img_grid = torchvision.utils.make_grid(c_depth, normalize = True)
+                    npimg = img_grid.permute(1, 2, 0).cpu().numpy()
+                    self.log_single_image(''.join((mode,str(s),'depth_')), image = npimg, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('depth_')), step=step)
+                    
+                    # self.log_image_grid(mode = mode, image_list = c_depth, scale = s, caption = 'depth_', character = ''.join((character,"{}".format(s))), step = step)
                     
                     c_automask = torch.concat(image_list_automask, 0)
                     c_automask = c_automask[:, None, :, :]

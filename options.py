@@ -5,6 +5,12 @@ import argparse
 
 file_dir = os.path.dirname(__file__)  # the directory that options.py resides in
 
+# important parameters 
+# range of depth map
+# disp 
+# validation metric
+# sampling frequency
+
 
 class MonodepthOptions:
     def __init__(self):
@@ -46,7 +52,7 @@ class MonodepthOptions:
         self.parser.add_argument("--num_layers",
                                  type=int,
                                  help="number of resnet layers",
-                                 default=34,
+                                 default=18,
                                  choices=[18, 34, 50, 101, 152])
         self.parser.add_argument("--dataset",
                                  type=str,
@@ -104,7 +110,7 @@ class MonodepthOptions:
         self.parser.add_argument("--max_depth",
                                  type=float,
                                  help="maximum depth",
-                                 default=1.0) # 150.0
+                                 default=197.0) # 150.0
         self.parser.add_argument("--use_stereo",
                                  help="if set, uses stereo pair for training",
                                  action="store_true")
