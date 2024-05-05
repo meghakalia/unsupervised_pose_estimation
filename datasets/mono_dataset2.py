@@ -105,8 +105,7 @@ class MonoDataset(data.Dataset):
                 ])
         
         self.transforms_ct_depth = transforms.Compose([
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomRotation(degrees = 30)
+            transforms.RandomHorizontalFlip(p=0.5)
             ])
         
         # transforms.RandomRotation(degrees = 30)

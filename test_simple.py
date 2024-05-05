@@ -14,7 +14,7 @@ from torchvision import transforms, datasets
 # from options_eval import MonodepthEvalOptions
 
 import networks
-from layers import disp_to_depth, transformation_from_parameters
+from layers import disp_to_depth, transformation_from_parameters, disp_to_depth_no_scaling
 
 import csv
 
@@ -27,7 +27,7 @@ def parse_args():
                         help='path to a test image or folder of images',
                         default = 'data/dataset_14/keyframe_1')
     parser.add_argument('--model_path', type=str,
-                        help='path to the test model', default ='for_frankie/for_frankie/weights_14') #models_pretrained/Model_MIA")
+                        help='path to the test model', default ='/code/data/models_depth_scaled/mdp/models/weights_9') #models_pretrained/Model_MIA")
 
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="png")
@@ -172,12 +172,14 @@ def test_simple(args):
             # Saving numpy file
             output_name = os.path.splitext(os.path.basename(image_path))[0]
             name_dest_npy = os.path.join(output_directory, "{}_disp.npy".format(output_name))
-            scaled_disp, depth_scaled = disp_to_depth(disp, 0.1, 150)
+            # scaled_disp, depth_scaled = disp_to_depth(disp, 0.1, 150)
+            scaled_disp = disp_resized
+            depth_scaled = disp_to_depth_no_scaling(disp)
             np.save(name_dest_npy, scaled_disp.cpu().numpy())
             
             # save depth 
             name_depth_npy = os.path.join(output_directory, "{}_depth.npy".format(output_name))
-            np.save(name_depth_npy, depth_scaled.cpu().numpy()*195.0)
+            np.save(name_depth_npy, depth_scaled.cpu().numpy())
             
 
             # Saving colormapped depth image

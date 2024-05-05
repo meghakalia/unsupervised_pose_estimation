@@ -27,7 +27,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default="/code/data/models")
+                                 default="/code/data/models_disc_prior_logging")
         
         self.parser.add_argument("--write_split_file",
                                  help="if set, will do the train-val split and write in a file",
@@ -110,7 +110,7 @@ class MonodepthOptions:
         self.parser.add_argument("--max_depth",
                                  type=float,
                                  help="maximum depth",
-                                 default=197.0) # 150.0
+                                 default=1.0) # 150.0
         self.parser.add_argument("--use_stereo",
                                  help="if set, uses stereo pair for training",
                                  action="store_true")
@@ -141,7 +141,7 @@ class MonodepthOptions:
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
-                                 default=10)
+                                 default=20)
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
                                  help="step size of the scheduler",
@@ -189,11 +189,15 @@ class MonodepthOptions:
                                  default=12)
 
         # LOADING options
+        self.parser.add_argument("--load_discriminator",
+                                 default  = 'store_true',
+                                 help="true or false")
+        
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
-                                 default  = None,
+                              #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
-                                 # default = None,
+                                 default = None,
                                  help="name of model to load")
         self.parser.add_argument("--models_to_load",
                                  nargs="+",
@@ -257,9 +261,13 @@ class MonodepthOptions:
                                       "we want to evaluate using the new benchmark.",
                                  action="store_true")
         
+        self.parser.add_argument("--multiscale_adversarial_prior",
+                                 help="whether we want to include the prior unity CT labels for depth",
+                                 action="store_true") 
+        
         self.parser.add_argument("--adversarial_prior",
                                  help="whether we want to include the prior unity CT labels for depth",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--discriminator_lr", type=float, default=0.0002, help="adam: learning rate")
         self.parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")

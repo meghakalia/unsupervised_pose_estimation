@@ -19,20 +19,33 @@ class GaussianLayer(nn.Module):
         self.proportions = nn.Parameter(self.proportions_rand/torch.sum(self.proportions_rand))
         # self.sigma = nn.Parameter(torch.rand(1))
         # self.gauss_layer  = gkern(input_size, self.sigma)
+        
+        self.sigmax = nn.Parameter(torch.rand(1))
+        self.sigmay = nn.Parameter(torch.rand(1))
+        self.meanx = nn.Parameter(torch.rand(1))
+        self.meany = nn.Parameter(torch.rand(1))
+        
    
-    def gaussian_fn(self, M, std):
-        n = torch.arange(0, M) - (M - 1.0) / 2.0
+    def gaussian_fn(self, M, std, mean):
+        #mean 0 - 1
+    
+        # n = torch.arange(0, M) - (M - 1.0) / 2.0
+        n = torch.arange(0, M).to('cuda') - mean
         sig2 = 2 * std * std
         n = n.to('cuda')
         sig2.to('cuda')
         w = torch.exp(-n ** 2 / sig2).to('cuda')
         return w
 
-    def gkern(self, kernlen=256, std=0.5):
+    def gkern(self, kernlen=256, stdx=0.5, stdy=0.5, meanx= 0.5, meany= 0.5):
         """Returns a 2D Gaussian kernel array."""
-        std = std*255
-        gkern1d = self.gaussian_fn(kernlen, std=std) 
-        gkern2d = torch.outer(gkern1d, gkern1d)
+        stdx = stdx*255
+        stdy = stdy*255
+        meanx = meanx*255
+        meany = meany*255
+        gkern1d_x = self.gaussian_fn(kernlen, std=stdx, mean = meanx) 
+        gkern1d_y = self.gaussian_fn(kernlen, std=stdy, mean = meany)
+        gkern2d = torch.outer(gkern1d_x, gkern1d_y)
         gkern2d = gkern2d[None, :, :]
         gkern2d = gkern2d.expand(3, kernlen, kernlen)
         return gkern2d
@@ -44,7 +57,8 @@ class GaussianLayer(nn.Module):
     def forward(self, sigmas):
         final_out = []
         if self.num_of_gaussians==1:
-            output  = [self.gkern(self.input_size, sigmas[i])[None, :, :, :] for i in range(sigmas.shape[0])]  
+            # output  = [self.gkern(self.input_size, sigmas[i])[None, :, :, :] for i in range(sigmas.shape[0])]  
+            output  = [self.gkern(self.input_size, sigmas[i][0], sigmas[i][1], sigmas[i][2], sigmas[i][3])[None, :, :, :] for i in range(sigmas.shape[0])]
         else:
             # untested, if gaussian are more than 1 
             output = []
@@ -56,7 +70,7 @@ class GaussianLayer(nn.Module):
                 output+= [output_temp[None, :, :, :]]
 
         final_out.append(torch.concat(output))
-        final_out.append(self.proportions)
+        # final_out.append(self.proportions)
         return final_out
 
     # def weights_init(self):

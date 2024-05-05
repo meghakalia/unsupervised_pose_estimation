@@ -25,6 +25,10 @@ class wandb_logging:
         self.config.update({'name':"phantom_Dataset_vanilla_hyperparameter_search"})
         self.config.update({'align_corner':"True"})
         self.config.update({'augmentation':"True"})
+        self.config.update({'scaled_pose':"False"})
+        self.config.update({'scaled_depth':"False"})
+        self.config.update({'discLoss_depth_space':"True"})
+        self.config.update({'up_scaled_intermediate_depths_discriminator':"True"})
         
         
         # self.config = dict(
@@ -41,7 +45,7 @@ class wandb_logging:
         
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
-        wandb.init(project="scaled_depth_trajectory_plot", config=self.config, dir = 'data/logs')
+        wandb.init(project="patchGAN_discriminator_prior", config=self.config, dir = 'data/logs')
         
         self.save_colored_depth = False
         
@@ -80,14 +84,21 @@ class wandb_logging:
     def log_lr(self, lr):
         wandb.log({'lr': lr})
     
-    def log_data(self, outputs, losses, mode, step=1, character="registration", stage=1, learning_rate = 0):
+    def log_data(self, outputs, losses, mode, step=1, character="registration", stage=1, learning_rate = 0, use_discriminator_loss = False, discriminator_loss = 0,
+                 discriminator_response= None):
        
         # log losses 
         # k = [key for key, value in losses.items()]
         
         for l, v in losses.items():
             wandb.log({"{}_{}".format(mode, l):v, 'custom_step':step})
+        
+        if use_discriminator_loss:
+            wandb.log({"{}_disc_loss".format(mode):discriminator_loss, 'custom_step':step})
             
+            
+            
+             
         wandb.log({"lr":learning_rate, 'custom_step':step})
         
         # log images 
@@ -96,6 +107,7 @@ class wandb_logging:
 
 
         # for j in range(min(4, self.config['batch_size'])):  # write a maxmimum of four images
+        image_list_disc_res_ct = []
         if character != "trajectory":
             for s in self.config['scales']:
                 image_list = []
@@ -104,6 +116,7 @@ class wandb_logging:
                 image_list_automask = []
                 image_list_color = []
                 image_list_pred_color = []
+                image_disc_response = []
                 
                 for frame_id in self.config['frame_ids'][1:]: # what is logged here 
 
@@ -141,6 +154,12 @@ class wandb_logging:
                         
                         if ("color", frame_id, s) in outputs:
                             image_list_pred_color.append(outputs[("color", frame_id, s)][:4,:,:])
+                            
+                        if use_discriminator_loss:
+                            # disc reponse 
+                            if ("disc_response", s) in discriminator_response:
+                                image_disc_response.append(discriminator_response[("disc_response", s)][:4,:,:])
+                                
                 
                 
                 if not self.save_colored_depth:
@@ -160,8 +179,20 @@ class wandb_logging:
                     
                     c_pred_color = torch.concat(image_list_pred_color, 0)
                     self.log_image_grid(mode = mode, image_list = c_pred_color, scale = s, caption = 'pred_color ', character = ''.join((character,"{}".format(s))), step = step)
+
+                    if use_discriminator_loss:
+                        c_discriminator_response = torch.concat(image_disc_response, 0)
+                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                        self.log_single_image(''.join((mode,str(s),'disc_response_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('disc_response_')), step=step)
                 # row = len(image_list), 
                 
+            if use_discriminator_loss:
+                image_list_disc_res_ct.append(discriminator_response[('disc_response_ct')][:4,:,:])
+                ct_discriminator_response = torch.concat(image_list_disc_res_ct, 0)
+                img_grid_disc_res_ct = torchvision.utils.make_grid(ct_discriminator_response, normalize = True)
+                npimg_disc_ct = img_grid_disc_res_ct.permute(1, 2, 0).cpu().numpy()
+                self.log_single_image(''.join((mode,str(s),'disc_response_ct_')), image = npimg_disc_ct, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('disc_response_ct_')), step=step)
                 
             # for s in self.config['scales']:
                 # make grid here, with original input images

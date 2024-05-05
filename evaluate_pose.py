@@ -154,11 +154,13 @@ def evaluate(opt):
     #                  "test_files_phantom14.txt"))[0:50]
     
     # num = 11
-    for num in range(3, 15):
+    for num in range(1, 15):
         filenames_1 = readlines(
             os.path.join(os.path.dirname(__file__), "splits", "endovis",
                         "test_files_phantom_{}.txt".format(num)))
         filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)
+        
+        # filenames = filenames_1
         # dataset = SCAREDRAWDataset(opt.data_path, filenames, opt.height, opt.width,
         #                            [0, 1], 4, is_train=False)
         # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,

@@ -68,9 +68,7 @@ class Trainer:
             self.opt.learning_rate = lr
             self.opt.sampling_frequency = sampling
             self.wanb_obj = wandb_logging.wandb_logging(self.opt)
-            
-        
-    
+
         # set the manually the hyperparamters you want to optimize using sampling_frequency and learning rate
         
         self.log_path = os.path.join(self.opt.log_dir, self.opt.model_name)
@@ -93,30 +91,48 @@ class Trainer:
         self.use_pose_net = not (self.opt.use_stereo and self.opt.frame_ids == [0])
 
         if self.opt.adversarial_prior: 
+            
+            self.disc_response = {}
             # Define model 
-            input_shape = (1, self.opt.width, self.opt.height) # this we will have to check
-            self.Discriminator = networks.Discriminator(input_shape)
-            self.Discriminator.to(self.device)
+            # input_shape = (1, self.opt.width, self.opt.height) # this we will have to check
+            self.criterion_Discriminator = torch.nn.BCEWithLogitsLoss()
             
-            # Adversarial ground truths
-            #  valid = Variable(Tensor(np.ones((real_A.size(0), *D_A2.output_shape))), requires_grad=False)
-            self.valid = torch.ones((1, *self.Discriminator.output_shape), requires_grad=False).repeat([self.opt.batch_size, 1, 1, 1]).to(self.device)
-            self.fake = torch.zeros((1, *self.Discriminator.output_shape), requires_grad=False).repeat([self.opt.batch_size, 1, 1, 1]).to(self.device)
-                 
+            if self.opt.multiscale_adversarial_prior: 
+                
+                for i in range(len(self.opt.scales)):
+                    input_shape[i] = (1, self.opt.width//2, self.opt.height//2)
+                    # self.Discriminator[i] = networks.Discriminator(input_shape[i])
+                    self.Discriminator[i] = networks.DiscriminatorUnet(input_shape[i])
+                    self.Discriminator[i].to(self.device)
+                    
+                     # Adversarial ground truths
+                    #  valid = Variable(Tensor(np.ones((real_A.size(0), *D_A2.output_shape))), requires_grad=False)
+                    self.valid[i] = torch.ones((1, *self.Discriminator.output_shape), requires_grad=False).repeat([self.opt.batch_size, 1, 1, 1]).to(self.device)
+                    self.fake[i] = torch.zeros((1, *self.Discriminator.output_shape), requires_grad=False).repeat([self.opt.batch_size, 1, 1, 1]).to(self.device)
+                    
+                    self.optimizer_Discriminator[i] = torch.optim.Adam(self.Discriminator[i].parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
+            else:
+                input_shape = (1, self.opt.width, self.opt.height) # this we will have to check
+                self.Discriminator = networks.DiscriminatorUnet(input_shape)
+                # self.Discriminator = networks.Discriminator(input_shape)
+                self.Discriminator.to(self.device)
+                
+                # Adversarial ground truths
+                #  valid = Variable(Tensor(np.ones((real_A.size(0), *D_A2.output_shape))), requires_grad=False)
+                self.valid = torch.ones((1, *self.Discriminator.output_shape), requires_grad=False).repeat([self.opt.batch_size, 1, 1, 1]).to(self.device)
+                self.fake = torch.zeros((1, *self.Discriminator.output_shape), requires_grad=False).repeat([self.opt.batch_size, 1, 1, 1]).to(self.device)
+                
+                self.optimizer_Discriminator = torch.optim.Adam(self.Discriminator.parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
+           
             # self.criterion_Discriminator = FrechetInceptionDistance(feature=64)
-            self.criterion_Discriminator = torch.nn.MSELoss()
-        
-            self.optimizer_Discriminator = torch.optim.Adam(self.Discriminator.parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
-            
+
             # self.disc_model_lr_scheduler = optim.lr_scheduler.StepLR(self.optimizer_Discriminator, self.opt.scheduler_step_size, 0.1)
-            
-            
+       
             # loss_real = criterion_GAN(Discriminator(real_A), valid)
             # # Fake loss (on batch of previously generated samples)
             # fake_A2_ = fake_A2_buffer.push_and_pop(fake_A2)
             # loss_fake = criterion_GAN(D_A2(fake_A2_.detach()), fake)
-        
-            
+
         if self.opt.use_stereo:
             self.opt.frame_ids.append("s")
 
@@ -346,8 +362,11 @@ class Trainer:
         print("Training")
         self.set_train()
 
+        d_loss = 0
+        num_run = 0 
         for batch_idx, inputs in enumerate(self.train_loader):
 
+            num_run+=1
             before_op_time = time.time()
 
             outputs, losses = self.process_batch(inputs)
@@ -358,7 +377,7 @@ class Trainer:
             
             
             if self.opt.adversarial_prior:
-                self.discriminator_train_step(inputs,outputs)
+                d_loss+=self.discriminator_train_step(inputs,outputs)
             
                 # loss_real = criterion_GAN(Discriminator(real_A), valid)
             # # Fake loss (on batch of previously generated samples)
@@ -382,7 +401,12 @@ class Trainer:
                 self.set_eval()
                 with torch.no_grad():
                     # self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.optimizer.param_groups[0]['lr'])
-                    self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1.)
+                    
+                    if self.opt.adversarial_prior:
+                        self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1., 
+                                      use_discriminator_loss=True, discriminator_loss=d_loss/num_run, discriminator_response=self.disc_response)
+                    else:
+                        self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1.)
                     # print('learning_rate_{}'.format(self.model_lr_scheduler.optimizer.param_groups[0]['lr']))
                 self.set_train()
                 # self.log("train", inputs, outputs, losses)
@@ -390,6 +414,7 @@ class Trainer:
 
             self.step += 1
         
+        print('disc_loss_{}'.format(d_loss/num_run))
         # self.model_lr_scheduler.step()
 
     def discriminator_train_step(self, inputs, outputs):
@@ -401,17 +426,53 @@ class Trainer:
         self.Discriminator.train()
         self.optimizer_Discriminator.zero_grad()
 
-            # Real loss
-        loss_real = self.criterion_Discriminator(self.Discriminator(inputs[('ct_prior', 0)]), self.valid)
+        ct_loss_disc = self.Discriminator(inputs[('ct_prior', 0)])
+        loss_real = self.criterion_Discriminator(ct_loss_disc, self.valid)
+        
+        self.disc_response[('disc_response_ct')] = ct_loss_disc
+        
+        loss_fake = 0 
+        for scale in self.opt.scales:
+            depth_disc_res = self.Discriminator(outputs[("depth", 0, scale)].detach())
+            self.disc_response[('disc_response', scale)] = depth_disc_res
+            loss_fake+=self.criterion_Discriminator(depth_disc_res, self.fake)
             
-        loss_fake = self.criterion_Discriminator(self.Discriminator(outputs[("depth", 0, 0)].detach()), self.fake)
+        loss_fake=loss_fake/len(self.opt.scales)
+        
         # Total loss
         loss_D = (loss_real + loss_fake) / 2
 
         loss_D.backward()
+        
         self.optimizer_Discriminator.step()
         
         self.Discriminator.eval()
+        
+        # train all discriminators together 
+        if self.opt.multiscale_adversarial_prior: 
+            
+            for i in range(len(self.opt.scales)):
+                self.Discriminator[i].train()
+                self.optimizer_Discriminator[i].zero_grad()
+
+                ct_loss_disc = self.Discriminator[i](inputs[('ct_prior', 0)]//2**i)
+                loss_real[i] = self.criterion_Discriminator(ct_loss_disc, self.valid[i])
+                
+                # this change we want scaled depths
+                loss_fake[i] = self.criterion_Discriminator(self.Discriminator[i](outputs[("depth", 0, i)].detach()), self.fake[i])
+                # Total loss
+                loss_D[i] = (loss_real[i] + loss_fake[i]) / 2
+
+                loss_D[i].backward()
+                self.optimizer_Discriminator[i].step()
+                
+                self.Discriminator[i].eval()
+            
+        
+        # gan loss: how far the generation is from the real
+        # (depth map - 1.0 ) + 
+        
+        return loss_D
             
             
     def get_trajectory_error(self, dataloader, gt_poses):
@@ -624,7 +685,9 @@ class Trainer:
                     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
                 source_scale = 0
 
-            _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth) # this should be 0-1
+            # _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth) # this should be 0-1
+            
+            depth = disp_to_depth_no_scaling(disp) # this should be 0-1
 
             outputs[("depth", 0, scale)] = depth
 
@@ -688,8 +751,12 @@ class Trainer:
         if self.opt.adversarial_prior:
             # how far is the model from valid examples 
             self.Discriminator.eval()
-            disc_loss = self.criterion_Discriminator(self.Discriminator(outputs[("depth", 0, 0)]), self.valid)
+            output_disc = self.Discriminator(outputs[("depth", 0, 0)]) # this may not be correct because of the scale. check whether we want to miniize disp or depth
+            disc_loss = self.criterion_Discriminator(output_disc, self.valid)
             losses["depth_loss/{}".format(0)] = disc_loss
+            
+            # how far is it from CT
+            
             
                 
         if self.opt.pre_trained_generator:
@@ -812,7 +879,7 @@ class Trainer:
             losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
-        losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.2 * disc_loss
+        losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):
@@ -856,17 +923,23 @@ class Trainer:
             " | loss: {:.5f} | time elapsed: {} | time left: {}"
         print(print_string.format(self.epoch, batch_idx, samples_per_sec, loss,
                                   sec_to_hm_str(time_sofar), sec_to_hm_str(training_time_left)))
-    def log_wand(self, mode, outputs, losses, wand_object, step, character, lr = 0):
+    def log_wand(self, mode, outputs, losses, wand_object, step, character, lr = 0, use_discriminator_loss = False, discriminator_loss = 0,
+                 discriminator_response= None):
         # output here is disparity image 
-        wand_object.log_data(outputs, losses, mode, character=character, step = step, learning_rate = lr) # step can also be epoch 
+        wand_object.log_data(outputs, losses, mode, character=character, step = step, learning_rate = lr, use_discriminator_loss = use_discriminator_loss, 
+                            discriminator_loss= discriminator_loss, discriminator_response= discriminator_response ) # step can also be epoch 
         
-    def log(self, mode, inputs, outputs, losses):
+    def log(self, mode, inputs, outputs, losses, disc_reponse = None, disc_loss = 0 , add_discriminator_loss = False):
         """Write an event to the tensorboard events file
         """
         writer = self.writers[mode]
         for l, v in losses.items():
             writer.add_scalar("{}".format(l), v, self.step)
 
+        if add_discriminator_loss:
+            writer.add_scalar("disc_loss", disc_loss, self.step)
+            writer.add_image("disc_response",disc_reponse, self.step)
+            
         for j in range(min(4, self.opt.batch_size)):  # write a maxmimum of four images
             for s in self.opt.scales:
                 for frame_id in self.opt.frame_ids:
@@ -924,7 +997,16 @@ class Trainer:
 
         save_path = os.path.join(save_folder, "{}.pth".format("adam"))
         torch.save(self.model_optimizer.state_dict(), save_path)
+        
+        if self.opt.adversarial_prior:
+            save_path_disc = os.path.join(save_folder, "discriminator.pth")
+            torch.save(self.Discriminator.state_dict(), save_path_disc)
 
+            save_path_disc_optim = os.path.join(save_folder, "{}.pth".format("adam_disc"))
+            torch.save(self.optimizer_Discriminator.state_dict(), save_path_disc_optim)
+            
+            
+            
     def load_model(self):
         """Load model(s) from disk
         """
@@ -934,6 +1016,10 @@ class Trainer:
             "Cannot find folder {}".format(self.opt.load_weights_folder)
         print("loading model from folder {}".format(self.opt.load_weights_folder))
 
+        # if discrmininator model 
+        if self.opt.load_discriminator:
+            self.opt.models_to_load.append('discriminator')
+            
         for n in self.opt.models_to_load:
             print("Loading {} weights...".format(n))
             path = os.path.join(self.opt.load_weights_folder, "{}.pth".format(n))
@@ -951,3 +1037,16 @@ class Trainer:
             self.model_optimizer.load_state_dict(optimizer_dict)
         else:
             print("Cannot find Adam weights so Adam is randomly initialized")
+            
+        if self.opt.load_discriminator:
+            disc_optimizer_load_path = os.path.join(self.opt.load_weights_folder, "adam_disc.pth")
+            if os.path.isfile(disc_optimizer_load_path):
+                print("Loading Adam weights")
+                optimizer_dict_disc = torch.load(disc_optimizer_load_path)
+                self.optimizer_Discriminator.load_state_dict(optimizer_dict_disc)
+            else:
+                print("Cannot find discriminator Adam weights so Adam is randomly initialized")
+            
+        
+            
+            
