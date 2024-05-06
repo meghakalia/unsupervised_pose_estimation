@@ -96,13 +96,13 @@ def load_model_fxn(load_weights_folder, models_to_load, models):
         models[n].load_state_dict(model_dict)
 
     # loading adam state
-    # optimizer_load_path = os.path.join(load_weights_folder, "adam.pth")
-    # if os.path.isfile(optimizer_load_path):
-    #     print("Loading Adam weights")
-    #     optimizer_dict = torch.load(optimizer_load_path)
-    #     model_optimizer.load_state_dict(optimizer_dict)
-    # else:
-    #     print("Cannot find Adam weights so Adam is randomly initialized")
+    optimizer_load_path = os.path.join(load_weights_folder, "adam.pth")
+    if os.path.isfile(optimizer_load_path):
+        print("Loading Adam weights")
+        optimizer_dict = torch.load(optimizer_load_path)
+        model_optimizer.load_state_dict(optimizer_dict)
+    else:
+        print("Cannot find Adam weights so Adam is randomly initialized")
             
 # model 
 # optimizer 
@@ -117,11 +117,11 @@ for z in range(1, 5):
     
 # frac = 0.45
     file_dir = os.path.dirname(__file__)  # the directory that options.py resides in
-    load_model = False 
+    load_model = True 
     # data loader
     models = {}
     input_size = ()
-    learning_rate = 10e-06
+    learning_rate = 10e-07 # original is 10e-06
     batch_size = 16
     num_epochs = 25
     parameters_to_train = []
@@ -146,7 +146,7 @@ for z in range(1, 5):
     # gauss_number =  1 + np.random.randint(2, 5, size= 1)
     gauss_number =  2
 
-    experiment_name = "trainable_dataaug_{}_gauss_num_{}_batchnorm_{}unet_32_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
+    experiment_name = "combinedframe_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
     # wandb 
     config = dict(
         height = height,
@@ -188,8 +188,7 @@ for z in range(1, 5):
         #     models['sigma'] = networks.FCN(output_size = 4) # 4 for each of std x, std y, mean x , mean y
         #     models['gaussian'] = networks.GaussianLayer(height)
 
-    if load_model:
-        load_model_fxn('code/train_unet_32_ssim_l1_0.45/models/weights_7', ["decompose"], models)
+    
         
     models['decompose'].to(device)
 
@@ -230,6 +229,9 @@ for z in range(1, 5):
     model_optimizer = optim.Adam(parameters_to_train, learning_rate)
     model_lr_scheduler = optim.lr_scheduler.StepLR(model_optimizer, scheduler_step_size, 0.1)
 
+    if load_model:
+        load_model_fxn('/code/code/trainable_dataaug_True_gauss_num_2_batchnorm_Trueunet_32_ssim_l1_0.55_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_22', ["decompose", "sigma1", "sigma2", "gaussian1", "gaussian2"], models)
+        
     # dataloader 
     datasets_dict = {"endovis": datasets.LungRAWDataset}
     dataset = datasets_dict['endovis']
@@ -306,39 +308,50 @@ for z in range(1, 5):
                 
             before_op_time = time.time()
 
-            features                = models["decompose"](inputs["color_aug", 0, 0])
-            outputs['decompose']    = features[1]
-            
-            if not train_unet_only:
+            total_loss = {'reprojection_loss':0, 'l1': 0, 'ssim_loss':0}
+           
+            for frame_id in [0, -1, 1]:
+                features                = models["decompose"](inputs["color_aug", frame_id, 0])
+                outputs['decompose']    = features[1]
                 
-                sigma_out1               = models['sigma1'](features[0]) # will spit out 5, 1 gaussian std 
-                gaussian_mask1           = models["gaussian1"](sigma_out1)
-                
-                sigma_out2               = models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
-                gaussian_mask2           = models["gaussian2"](sigma_out2)
-                
-                outputs['compose'] = outputs['decompose'] * gaussian_mask1[0] * gaussian_mask2[0]
-                
-                # if not bool_multi_gauss:
-                #     if same_gauss_kernel:
-                #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0].repeat(16,1,1,1)
-                #     else:
-                #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0]
-                # else:
-                #     if same_gauss_kernel:
-                #         # output of gauss should be : 5 x 1
-                #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0].repeat(16,1,1,1)
-                #     else:
-                #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0]
+                if not train_unet_only:
                     
+                    sigma_out1               = models['sigma1'](features[0]) # will spit out 5, 1 gaussian std 
+                    gaussian_mask1           = models["gaussian1"](sigma_out1)
                     
-            else:
-                outputs['compose'] = outputs['decompose']
+                    sigma_out2               = models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
+                    gaussian_mask2           = models["gaussian2"](sigma_out2)
+                    
+                    outputs['compose'] = outputs['decompose'] * gaussian_mask1[0] * gaussian_mask2[0]
+                    
+                    # if not bool_multi_gauss:
+                    #     if same_gauss_kernel:
+                    #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0].repeat(16,1,1,1)
+                    #     else:
+                    #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0]
+                    # else:
+                    #     if same_gauss_kernel:
+                    #         # output of gauss should be : 5 x 1
+                    #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0].repeat(16,1,1,1)
+                    #     else:
+                    #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0]
+                        
+                        
+                else:
+                    outputs['compose'] = outputs['decompose']
 
-            losses = compute_reprojection_loss(outputs['compose'], inputs["color_aug", 0, 0], frac)
+                losses = compute_reprojection_loss(outputs['compose'], inputs["color_aug", frame_id, 0], frac)
+                total_loss['l1']+=losses['l1']
+                total_loss['reprojection_loss']+=losses['reprojection_loss']
+                total_loss['ssim_loss']+=losses['ssim_loss']
             
+            total_loss['l1']/=3
+            total_loss['reprojection_loss']/=3
+            total_loss['ssim_loss']/=3
+                
             model_optimizer.zero_grad()
-            losses['reprojection_loss'].backward()
+            total_loss['reprojection_loss'].backward()
+            # losses['reprojection_loss'].backward()
             model_optimizer.step()
 
             duration = time.time() - before_op_time
@@ -346,10 +359,15 @@ for z in range(1, 5):
             step+=1
             
             # save model
-            if losses['reprojection_loss'] < prev_error: 
+            # if losses['reprojection_loss'] < prev_error: 
+            #     # save_model 
+            #     save_model(epoch, 'code/{}'.format(experiment_name), models, model_optimizer)
+            #     prev_error = losses['reprojection_loss']
+            
+            if total_loss['reprojection_loss'] < prev_error: 
                 # save_model 
                 save_model(epoch, 'code/{}'.format(experiment_name), models, model_optimizer)
-                prev_error = losses['reprojection_loss']
+                prev_error = total_loss['reprojection_loss']
             
             # wand_b loggin 
             if ( step + 1) %  save_frequency == 0:
@@ -389,7 +407,7 @@ for z in range(1, 5):
                         
                     
                     wandb.log({"{}".format('learning_rate'):model_lr_scheduler.optimizer.param_groups[0]['lr'],'custom_step':custom_step})
-                    for l, v in losses.items():
+                    for l, v in total_loss.items():
                         wandb.log({"{}_{}".format('train', l):v, 'custom_step':custom_step})
                     
         model_lr_scheduler.step()
