@@ -5,7 +5,7 @@ from .pose_cnn import PoseCNN
 from .GeneratorResNet import GeneratorResNet
 from .DiscriminatorPatchGAN import Discriminator, DiscriminatorUnet
 
-from .unet import UNet
+from .unet import UNet, UNet_instanceNorm
 
 from .gaussian import GaussianLayer
 

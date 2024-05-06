@@ -34,15 +34,15 @@ class GaussianLayer(nn.Module):
         sig2 = 2 * std * std
         n = n.to('cuda')
         sig2.to('cuda')
-        w = torch.exp(-n ** 2 / sig2).to('cuda')
+        w = torch.exp(-n ** 2 / (sig2 + 1e-7)).to('cuda')
         return w
 
     def gkern(self, kernlen=256, stdx=0.5, stdy=0.5, meanx= 0.5, meany= 0.5):
         """Returns a 2D Gaussian kernel array."""
-        stdx = stdx*255
-        stdy = stdy*255
-        meanx = meanx*255
-        meany = meany*255
+        stdx = stdx*kernlen
+        stdy = stdy*kernlen
+        meanx = meanx*kernlen
+        meany = meany*kernlen
         gkern1d_x = self.gaussian_fn(kernlen, std=stdx, mean = meanx) 
         gkern1d_y = self.gaussian_fn(kernlen, std=stdy, mean = meany)
         gkern2d = torch.outer(gkern1d_x, gkern1d_y)
