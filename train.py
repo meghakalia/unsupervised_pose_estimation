@@ -25,8 +25,8 @@ if opts.wandb_sweep:
 def main():
     
     # learning_rate_opt = [3, 4, 5, 6, 7 , 8]
-    learning_rate_opt = np.random.permutation(4) + 2
-    # for i in range(7):
+    learning_rate_opt = np.random.permutation(5) + 3
+    # for i in range(4):
     #    idx = np.random.randint(0,6)
     # learn_rate = 10**(-float(learning_rate_opt[i]))
     learn_rate = 10**(-float(4))

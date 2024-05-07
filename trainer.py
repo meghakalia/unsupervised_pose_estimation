@@ -6,6 +6,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+
 import numpy as np
 import time
 
@@ -14,7 +15,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 # from torchmetrics.image.fid import FrechetInceptionDistance
-
+from torchvision.transforms import Resize
 
 import json
 
@@ -67,7 +68,7 @@ class Trainer:
             
             self.opt.learning_rate = lr
             self.opt.sampling_frequency = sampling
-            self.wanb_obj = wandb_logging.wandb_logging(self.opt)
+            self.wanb_obj = wandb_logging.wandb_logging(self.opt, experiment_name = 'gaussTrain_{}_disc_prior_{}'.format(False, 'patchGAN'))
 
         # set the manually the hyperparamters you want to optimize using sampling_frequency and learning rate
         
@@ -90,6 +91,7 @@ class Trainer:
 
         self.use_pose_net = not (self.opt.use_stereo and self.opt.frame_ids == [0])
 
+        
         if self.opt.adversarial_prior: 
             
             self.disc_response = {}
@@ -113,8 +115,8 @@ class Trainer:
                     self.optimizer_Discriminator[i] = torch.optim.Adam(self.Discriminator[i].parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
             else:
                 input_shape = (1, self.opt.width, self.opt.height) # this we will have to check
-                self.Discriminator = networks.DiscriminatorUnet(input_shape)
-                # self.Discriminator = networks.Discriminator(input_shape)
+                # self.Discriminator = networks.DiscriminatorUnet(input_shape)
+                self.Discriminator = networks.Discriminator(input_shape)
                 self.Discriminator.to(self.device)
                 
                 # Adversarial ground truths
@@ -124,6 +126,42 @@ class Trainer:
                 
                 self.optimizer_Discriminator = torch.optim.Adam(self.Discriminator.parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
            
+            if self.opt.gaussian_correction:
+                
+                self.resize_transform = {}
+                for s in self.opt.scales:
+                    self.resize_transform[s] = Resize((192// 2 ** s,192// 2 ** s))
+                    
+                
+                self.gauss_parameters_to_train = []
+                self.models['decompose'] = networks.UNet(3, 3)
+                
+                self.gaussian_mask1 = []
+                self.gaussian_mask2 = []
+                self.gauss_reconstructed = []
+                
+                for g in range(1, self.opt.gauss_number+1):
+                   self.models['sigma{}'.format(g)] = networks.FCN(output_size = 4) # 4 for each of std x, std y, mean x , mean y
+                   self.models['gaussian{}'.format(g)] = networks.GaussianLayer(self.opt.height)
+                   
+                   self.models['sigma{}'.format(g)].to(self.device)
+                   self.models['gaussian{}'.format(g)].to(self.device)
+                   
+                self.models['decompose'].to(self.device)
+      
+                self.gauss_parameters_to_train += list(self.models["decompose"].parameters())
+                
+                for g in range(1, self.opt.gauss_number+1):
+                    self.gauss_parameters_to_train += list(self.models['sigma{}'.format(g)].parameters())
+                    self.gauss_parameters_to_train += list(self.models['gaussian{}'.format(g)].parameters())
+                
+                self.gauss_model_optimizer = optim.Adam(self.gauss_parameters_to_train, self.opt.gauss_lr)
+                self.gauss_model_lr_scheduler = optim.lr_scheduler.StepLR(self.gauss_model_optimizer, self.opt.gauss_scheduler_step_size, 0.1)
+                
+                # load model
+                
+                
+               
             # self.criterion_Discriminator = FrechetInceptionDistance(feature=64)
 
             # self.disc_model_lr_scheduler = optim.lr_scheduler.StepLR(self.optimizer_Discriminator, self.opt.scheduler_step_size, 0.1)
@@ -369,6 +407,39 @@ class Trainer:
             num_run+=1
             before_op_time = time.time()
 
+            # process and update inputs here 
+            if self.opt.gaussian_correction:
+                
+                for key, ipt in inputs.items():
+                    inputs[key] = ipt.to(self.device)
+                
+                gaussian_reponse = {'gaussian_mask1':[], 'gaussian_mask2':[], 'reconstructed':[], 'decomposed':[], 'original':[]}
+                for frame_id in self.opt.frame_ids:
+                    features                = self.models["decompose"](inputs["color_aug", frame_id, 0])
+                    decomposed    = features[1]
+                    
+                   
+                
+                    sigma_out1               = self.models['sigma1'](features[0]) # will spit out 5, 1 gaussian std 
+                    gaussian_mask1           = self.models["gaussian1"](sigma_out1)
+                    
+                    sigma_out2               = self.models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
+                    gaussian_mask2           = self.models["gaussian2"](sigma_out2)
+                    
+                    re_composed = decomposed * gaussian_mask1[0] * gaussian_mask2[0]
+                    
+                    gaussian_reponse['original'].append(inputs["color_aug", frame_id, 0][0, :, :, :]) 
+                    # update the images
+                    for s in self.opt.scales:
+                        inputs["color_aug", frame_id, s] = self.resize_transform[s](decomposed)
+
+                    gaussian_reponse['gaussian_mask1'].append(gaussian_mask1[0][0, :, :, :]) 
+                    gaussian_reponse['gaussian_mask2'].append(gaussian_mask2[0][0, :, :, :]) 
+                    gaussian_reponse['reconstructed'].append(re_composed[0, :, :, :]) 
+                    gaussian_reponse['decomposed'].append(decomposed[0, :, :, :]) 
+                    
+                    
+                    
             outputs, losses = self.process_batch(inputs)
 
             self.model_optimizer.zero_grad()
@@ -403,7 +474,14 @@ class Trainer:
                     # self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.optimizer.param_groups[0]['lr'])
                     
                     if self.opt.adversarial_prior:
-                        self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1., 
+                        
+                        if self.opt.gaussian_correction:
+                            self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1., 
+                                      use_discriminator_loss=True, discriminator_loss=d_loss/num_run, discriminator_response=self.disc_response, 
+                                      gaussian_decomposition=self.opt.gaussian_correction, gaussian_response=gaussian_reponse)
+                            
+                        else:
+                            self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1., 
                                       use_discriminator_loss=True, discriminator_loss=d_loss/num_run, discriminator_response=self.disc_response)
                     else:
                         self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1.)
@@ -924,10 +1002,10 @@ class Trainer:
         print(print_string.format(self.epoch, batch_idx, samples_per_sec, loss,
                                   sec_to_hm_str(time_sofar), sec_to_hm_str(training_time_left)))
     def log_wand(self, mode, outputs, losses, wand_object, step, character, lr = 0, use_discriminator_loss = False, discriminator_loss = 0,
-                 discriminator_response= None):
+                 discriminator_response= None, gaussian_decomposition = False, gaussian_response = None):
         # output here is disparity image 
         wand_object.log_data(outputs, losses, mode, character=character, step = step, learning_rate = lr, use_discriminator_loss = use_discriminator_loss, 
-                            discriminator_loss= discriminator_loss, discriminator_response= discriminator_response ) # step can also be epoch 
+                            discriminator_loss= discriminator_loss, discriminator_response= discriminator_response, gaussian_decomposition = gaussian_decomposition, gaussian_response = gaussian_response ) # step can also be epoch 
         
     def log(self, mode, inputs, outputs, losses, disc_reponse = None, disc_loss = 0 , add_discriminator_loss = False):
         """Write an event to the tensorboard events file
@@ -1029,14 +1107,14 @@ class Trainer:
             model_dict.update(pretrained_dict)
             self.models[n].load_state_dict(model_dict)
 
-        # loading adam state
-        optimizer_load_path = os.path.join(self.opt.load_weights_folder, "adam.pth")
-        if os.path.isfile(optimizer_load_path):
-            print("Loading Adam weights")
-            optimizer_dict = torch.load(optimizer_load_path)
-            self.model_optimizer.load_state_dict(optimizer_dict)
-        else:
-            print("Cannot find Adam weights so Adam is randomly initialized")
+        # # loading adam state
+        # optimizer_load_path = os.path.join(self.opt.load_weights_folder, "adam.pth")
+        # if os.path.isfile(optimizer_load_path):
+        #     print("Loading Adam weights")
+        #     optimizer_dict = torch.load(optimizer_load_path)
+        #     self.model_optimizer.load_state_dict(optimizer_dict)
+        # else:
+        #     print("Cannot find Adam weights so Adam is randomly initialized")
             
         if self.opt.load_discriminator:
             disc_optimizer_load_path = os.path.join(self.opt.load_weights_folder, "adam_disc.pth")

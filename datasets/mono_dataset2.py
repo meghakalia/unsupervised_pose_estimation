@@ -11,6 +11,7 @@ import torch
 import torch.utils.data as data
 from torchvision import transforms
 from torchvision.utils import save_image, make_grid
+import torchvision.transforms.functional as TF
 
 ImageFile.LOAD_TRUNCATED_IMAGES=True
 
@@ -99,7 +100,7 @@ class MonoDataset(data.Dataset):
         self.transforms_aug = transforms.Compose([
                 transforms.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue),
                 transforms.RandomAutocontrast(),
-                # transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomHorizontalFlip(p=0.5),
                 # transforms.RandomAutocontrast()
                 # transforms.RandomRotation(degrees = 30)
                 ])
@@ -134,7 +135,10 @@ class MonoDataset(data.Dataset):
                 inputs[(n, im, i)] = self.to_tensor(f)
                 if not inputs.get((n + "_aug", im, i), 0):
                     inputs[(n + "_aug", im, i)] = 0 
+                
+                state = torch.get_rng_state()
                 inputs[(n + "_aug", im, i)] = self.to_tensor(color_aug(f))
+                torch.set_rng_state(state)
 
     def __len__(self):
         return len(self.filenames)

@@ -16,7 +16,7 @@ from typing import overload
 class wandb_logging:
     
    
-    def __init__(self, options, models = None):
+    def __init__(self, options, experiment_name = None, models = None):
         wandb.login()
         
         self.opts = options
@@ -45,7 +45,10 @@ class wandb_logging:
         
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
-        wandb.init(project="patchGAN_discriminator_prior", config=self.config, dir = 'data/logs')
+        if experiment_name:
+            wandb.init(project="gauss_decompose patchGAN_discriminator_prior", config=self.config, dir = 'data/logs')
+        else:
+            wandb.init(project="gauss_decompose patchGAN_discriminator_prior", config=self.config, dir = 'data/logs', name = experiment_name)
         
         self.save_colored_depth = False
         
@@ -85,7 +88,7 @@ class wandb_logging:
         wandb.log({'lr': lr})
     
     def log_data(self, outputs, losses, mode, step=1, character="registration", stage=1, learning_rate = 0, use_discriminator_loss = False, discriminator_loss = 0,
-                 discriminator_response= None):
+                 discriminator_response= None, gaussian_decomposition = False, gaussian_response = None):
        
         # log losses 
         # k = [key for key, value in losses.items()]
@@ -117,6 +120,10 @@ class wandb_logging:
                 image_list_color = []
                 image_list_pred_color = []
                 image_disc_response = []
+                image_gauss_1 = []
+                image_gauss_2 = []
+                image_decompose = []
+                image_compose = []
                 
                 for frame_id in self.config['frame_ids'][1:]: # what is logged here 
 
@@ -160,8 +167,12 @@ class wandb_logging:
                             if ("disc_response", s) in discriminator_response:
                                 image_disc_response.append(discriminator_response[("disc_response", s)][:4,:,:])
                                 
-                
-                
+                        # if gaussian_decomposition:
+                        #     image_gauss_1.append(gaussian_response['gaussian_mask1'])
+                        #     image_gauss_2.append(gaussian_response['gaussian_mask2'])
+                        #     image_decompose.append(gaussian_response['decomposed'])
+                        #     image_compose.append(gaussian_response['reconstructed'])
+                            
                 if not self.save_colored_depth:
                     c = torch.concat(image_list, 0)
                     self.log_image_grid(mode = mode, image_list = c, scale = s, caption = ' ', character = ''.join((character,"{}".format(s))), step = step)
@@ -185,6 +196,36 @@ class wandb_logging:
                         img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
                         npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
                         self.log_single_image(''.join((mode,str(s),'disc_response_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('disc_response_')), step=step)
+                        
+                    if gaussian_decomposition:
+                         
+                        c_discriminator_response = torch.concat(gaussian_response['gaussian_mask1'], 2)
+                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                        self.log_single_image(''.join((mode,str(s),'gauss1_response_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('gauss1_response_')), step=step)
+                        
+                        c_discriminator_response = torch.concat(gaussian_response['gaussian_mask2'], 2)
+                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                        self.log_single_image(''.join((mode,str(s),'gauss2_response_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('gauss2_response_')), step=step)
+                        
+                        c_discriminator_response = torch.concat(gaussian_response['decomposed'], 2)
+                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                        self.log_single_image(''.join((mode,str(s),'decompose_gauss_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('decompose_gauss_')), step=step)
+                        
+                        c_discriminator_response = torch.concat(gaussian_response['reconstructed'], 2)
+                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                        self.log_single_image(''.join((mode,str(s),'image_compose_gauss_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('image_compose_gauss_')), step=step)
+                        
+                        c_discriminator_response = torch.concat(gaussian_response['original'], 2)
+                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                        self.log_single_image(''.join((mode,str(s),'original_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('original_')), step=step)
+                # row = len(image_list), 
+                
+                # row = len(image_list), 
                 # row = len(image_list), 
                 
             if use_discriminator_loss:

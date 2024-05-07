@@ -137,7 +137,7 @@ for z in range(1, 5):
     device            = torch.device("cuda")
     n_channels        = 3
     n_classes         = 3
-    scheduler_step_size = 15
+    scheduler_step_size = 5
     bool_multi_gauss = True
     separate_mean_std = True
     same_gauss_kernel = False # if all images have same gaussian profile
@@ -146,7 +146,7 @@ for z in range(1, 5):
     # gauss_number =  1 + np.random.randint(2, 5, size= 1)
     gauss_number =  2
 
-    experiment_name = "combinedframe_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
+    experiment_name = "1_combinedframe_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
     # wandb 
     config = dict(
         height = height,
@@ -313,6 +313,15 @@ for z in range(1, 5):
             for frame_id in [0, -1, 1]:
                 features                = models["decompose"](inputs["color_aug", frame_id, 0])
                 outputs['decompose']    = features[1]
+                
+                sigma_out1               = models['sigma1'](features[0]) # will spit out 5, 1 gaussian std 
+                gaussian_mask1           = models["gaussian1"](sigma_out1)
+                
+                sigma_out2               = models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
+                gaussian_mask2           = models["gaussian2"](sigma_out2)
+                
+                outputs['compose'] = outputs['decompose'] * gaussian_mask1[0] * gaussian_mask2[0]
+                
                 
                 if not train_unet_only:
                     

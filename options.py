@@ -28,9 +28,30 @@ class MonodepthOptions:
                                  type=str,
                                  help="log directory",
                                  default="/code/data/models_disc_prior_logging")
+        self.parser.add_argument("--gauss_number",
+                                   type=int,
+                                   help="gaussin number in gauss decomposition",
+                                   default=2)
+        self.parser.add_argument("--gauss_lr",
+                                   type=float,
+                                   help="gaussin number in gauss decomposition",
+                                   default=10e-8)
+        self.parser.add_argument("--gauss_scheduler_step_size",
+                                   type=int,
+                                   help="gaussin number in gauss decomposition",
+                                   default=5)
+        
+        self.parser.add_argument("--gauss_pretrained_model_path",
+                                   type=str,
+                                   help="gaussian pretrained model path",
+                                   default='')
         
         self.parser.add_argument("--write_split_file",
                                  help="if set, will do the train-val split and write in a file",
+                                 action="store_true")# false
+        
+        self.parser.add_argument("--gaussian_correction",
+                                 help="if set, will do enable gaussian correction",
                                  action="store_true")# false
 
         # TRAINING options
@@ -190,20 +211,22 @@ class MonodepthOptions:
 
         # LOADING options
         self.parser.add_argument("--load_discriminator",
-                                 default  = 'store_true',
+                                 action="store_true",
                                  help="true or false")
         
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
+                                 default = None, 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
-                                 default = None,
+                                 # default = '/code/code/combinedframe_recon_pretrained_trainable_dataaug_True_gauss_num_2_batchnorm_True_ssim_l1_0.55_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_14',
                                  help="name of model to load")
         self.parser.add_argument("--models_to_load",
                                  nargs="+",
                                  type=str,
                                  help="models to load",
-                                 default=["pose_encoder", "pose", "depth", "encoder"])
+                                 default = ["decompose", "sigma1", "sigma2", "gaussian1", "gaussian2"] )
+                              #    default=["pose_encoder", "pose", "depth", "encoder"])
                               #    default=["position_encoder", "position"])
 
         # LOGGING options
@@ -267,7 +290,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--adversarial_prior",
                                  help="whether we want to include the prior unity CT labels for depth",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--discriminator_lr", type=float, default=0.0002, help="adam: learning rate")
         self.parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")

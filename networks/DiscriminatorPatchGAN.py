@@ -11,7 +11,7 @@ class Discriminator(nn.Module):
         # self.output_shape = (1, height // 2 ** 4, width // 2 ** 4)
         
         self.output_shape = (1, height // 2 ** 3, width // 2 ** 3)
-
+        self.base_filters = 16
         def discriminator_block(in_filters, out_filters, normalize=True):
             """Returns downsampling layers of each discriminator block"""
             layers = [nn.Conv2d(in_filters, out_filters, 4, stride=2, padding=1)]
@@ -21,12 +21,12 @@ class Discriminator(nn.Module):
             return layers
 
         self.model = nn.Sequential(
-            *discriminator_block(channels, 64, normalize=False),
-            *discriminator_block(64, 128),
-            *discriminator_block(128, 256),
+            *discriminator_block(channels, self.base_filters, normalize=False),
+            *discriminator_block(self.base_filters, self.base_filters*2),
+            *discriminator_block(self.base_filters*2, self.base_filters*4),
             # *discriminator_block(256, 512),
             nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(256, 1, 4, padding=1)
+            nn.Conv2d(self.base_filters*4, 1, 4, padding=1)
         )
 
     def forward(self, img):
