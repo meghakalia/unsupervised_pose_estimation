@@ -52,7 +52,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--gaussian_correction",
                                  help="if set, will do enable gaussian correction",
-                                 action="store_true")# false
+                                 action="store_false")# false
 
         # TRAINING options
         self.parser.add_argument("--pre_trained_generator",
@@ -216,10 +216,10 @@ class MonodepthOptions:
         
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
-                                 default = None, 
+                                 # default = None, 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
-                                 # default = '/code/code/combinedframe_recon_pretrained_trainable_dataaug_True_gauss_num_2_batchnorm_True_ssim_l1_0.55_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_14',
+                                 default = '/code/code/3_combinedframe_recon_pretrained_trainable_dataaug_True_gauss_num_2_batchnorm_True_ssim_l1_0.55_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_19',
                                  help="name of model to load")
         self.parser.add_argument("--models_to_load",
                                  nargs="+",

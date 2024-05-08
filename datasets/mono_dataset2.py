@@ -135,9 +135,11 @@ class MonoDataset(data.Dataset):
                 inputs[(n, im, i)] = self.to_tensor(f)
                 if not inputs.get((n + "_aug", im, i), 0):
                     inputs[(n + "_aug", im, i)] = 0 
-                
+                    
+                # save_image(self.to_tensor((f)), 'no_aug_{}_{}.png'.format(im, i))
                 state = torch.get_rng_state()
                 inputs[(n + "_aug", im, i)] = self.to_tensor(color_aug(f))
+                # save_image(inputs[(n + "_aug", im, i)], 'after_aug_{}_{}.png'.format(im, i))
                 torch.set_rng_state(state)
 
     def __len__(self):

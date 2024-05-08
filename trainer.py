@@ -126,38 +126,44 @@ class Trainer:
                 
                 self.optimizer_Discriminator = torch.optim.Adam(self.Discriminator.parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
            
-            if self.opt.gaussian_correction:
+        if self.opt.gaussian_correction:
+            
+            self.resize_transform = {}
+            for s in self.opt.scales:
+                self.resize_transform[s] = Resize((192// 2 ** s,192// 2 ** s))
                 
-                self.resize_transform = {}
-                for s in self.opt.scales:
-                    self.resize_transform[s] = Resize((192// 2 ** s,192// 2 ** s))
-                    
+            
+            self.gauss_parameters_to_train = []
+            self.models['decompose'] = networks.UNet(3, 3)
+            
+            self.gaussian_mask1 = []
+            self.gaussian_mask2 = []
+            self.gauss_reconstructed = []
+            
+            for g in range(1, self.opt.gauss_number+1):
+                self.models['sigma{}'.format(g)] = networks.FCN(output_size = 4) # 4 for each of std x, std y, mean x , mean y
+                self.models['gaussian{}'.format(g)] = networks.GaussianLayer(self.opt.height)
                 
-                self.gauss_parameters_to_train = []
-                self.models['decompose'] = networks.UNet(3, 3)
+                self.models['sigma{}'.format(g)].to(self.device)
+                self.models['gaussian{}'.format(g)].to(self.device)
                 
-                self.gaussian_mask1 = []
-                self.gaussian_mask2 = []
-                self.gauss_reconstructed = []
-                
-                for g in range(1, self.opt.gauss_number+1):
-                   self.models['sigma{}'.format(g)] = networks.FCN(output_size = 4) # 4 for each of std x, std y, mean x , mean y
-                   self.models['gaussian{}'.format(g)] = networks.GaussianLayer(self.opt.height)
-                   
-                   self.models['sigma{}'.format(g)].to(self.device)
-                   self.models['gaussian{}'.format(g)].to(self.device)
-                   
-                self.models['decompose'].to(self.device)
-      
-                self.gauss_parameters_to_train += list(self.models["decompose"].parameters())
-                
-                for g in range(1, self.opt.gauss_number+1):
-                    self.gauss_parameters_to_train += list(self.models['sigma{}'.format(g)].parameters())
-                    self.gauss_parameters_to_train += list(self.models['gaussian{}'.format(g)].parameters())
-                
-                self.gauss_model_optimizer = optim.Adam(self.gauss_parameters_to_train, self.opt.gauss_lr)
-                self.gauss_model_lr_scheduler = optim.lr_scheduler.StepLR(self.gauss_model_optimizer, self.opt.gauss_scheduler_step_size, 0.1)
-                
+            self.models['decompose'].to(self.device)
+
+            self.gauss_parameters_to_train += list(self.models["decompose"].parameters())
+            
+            for g in range(1, self.opt.gauss_number+1):
+                self.gauss_parameters_to_train += list(self.models['sigma{}'.format(g)].parameters())
+                self.gauss_parameters_to_train += list(self.models['gaussian{}'.format(g)].parameters())
+            
+            self.gauss_model_optimizer = optim.Adam(self.gauss_parameters_to_train, self.opt.gauss_lr)
+            self.gauss_model_lr_scheduler = optim.lr_scheduler.StepLR(self.gauss_model_optimizer, self.opt.gauss_scheduler_step_size, 0.1)
+            
+            self.models['decompose'].eval()
+            self.models['sigma1'].eval()
+            self.models['sigma1'].eval()
+            self.models['gaussian1'].eval()
+            self.models['gaussian2'].eval()
+            
                 # load model
                 
                 
@@ -472,6 +478,10 @@ class Trainer:
                 self.set_eval()
                 with torch.no_grad():
                     # self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = self.model_lr_scheduler.optimizer.param_groups[0]['lr'])
+                    
+                    self.log_wand("train2", outputs, losses, self.wanb_obj, step = self.epoch, character="disp", lr = 1., 
+                                    use_discriminator_loss=False, discriminator_loss= 0, discriminator_response=None, 
+                                    gaussian_decomposition=self.opt.gaussian_correction, gaussian_response=gaussian_reponse)
                     
                     if self.opt.adversarial_prior:
                         

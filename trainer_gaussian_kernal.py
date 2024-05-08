@@ -96,13 +96,13 @@ def load_model_fxn(load_weights_folder, models_to_load, models):
         models[n].load_state_dict(model_dict)
 
     # loading adam state
-    optimizer_load_path = os.path.join(load_weights_folder, "adam.pth")
-    if os.path.isfile(optimizer_load_path):
-        print("Loading Adam weights")
-        optimizer_dict = torch.load(optimizer_load_path)
-        model_optimizer.load_state_dict(optimizer_dict)
-    else:
-        print("Cannot find Adam weights so Adam is randomly initialized")
+    # optimizer_load_path = os.path.join(load_weights_folder, "adam.pth")
+    # if os.path.isfile(optimizer_load_path):
+    #     print("Loading Adam weights")
+    #     optimizer_dict = torch.load(optimizer_load_path)
+    #     model_optimizer.load_state_dict(optimizer_dict)
+    # else:
+    #     print("Cannot find Adam weights so Adam is randomly initialized")
             
 # model 
 # optimizer 
@@ -146,7 +146,7 @@ for z in range(1, 5):
     # gauss_number =  1 + np.random.randint(2, 5, size= 1)
     gauss_number =  2
 
-    experiment_name = "1_combinedframe_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
+    experiment_name = "4_combinedframe_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
     # wandb 
     config = dict(
         height = height,
@@ -230,7 +230,7 @@ for z in range(1, 5):
     model_lr_scheduler = optim.lr_scheduler.StepLR(model_optimizer, scheduler_step_size, 0.1)
 
     if load_model:
-        load_model_fxn('/code/code/trainable_dataaug_True_gauss_num_2_batchnorm_Trueunet_32_ssim_l1_0.55_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_22', ["decompose", "sigma1", "sigma2", "gaussian1", "gaussian2"], models)
+        load_model_fxn('/code/code/3_combinedframe_recon_pretrained_trainable_dataaug_True_gauss_num_2_batchnorm_True_ssim_l1_0.55_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_19', ["decompose", "sigma1", "sigma2", "gaussian1", "gaussian2"], models)
         
     # dataloader 
     datasets_dict = {"endovis": datasets.LungRAWDataset}
@@ -281,7 +281,7 @@ for z in range(1, 5):
     step = 0
     start_time = time.time()
     step = 1
-    save_frequency = 50
+    save_frequency = 1
     custom_step = 0
     prev_error = 100000000
     for  epoch in range(num_epochs):
@@ -373,6 +373,7 @@ for z in range(1, 5):
             #     save_model(epoch, 'code/{}'.format(experiment_name), models, model_optimizer)
             #     prev_error = losses['reprojection_loss']
             
+            # save model
             if total_loss['reprojection_loss'] < prev_error: 
                 # save_model 
                 save_model(epoch, 'code/{}'.format(experiment_name), models, model_optimizer)
