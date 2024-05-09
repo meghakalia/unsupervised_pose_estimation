@@ -432,6 +432,7 @@ class Trainer:
                     sigma_out2               = self.models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
                     gaussian_mask2           = self.models["gaussian2"](sigma_out2)
                     
+                    # check this, this looks like as if this should be addition
                     re_composed = decomposed * gaussian_mask1[0] * gaussian_mask2[0]
                     
                     gaussian_reponse['original'].append(inputs["color_aug", frame_id, 0][0, :, :, :]) 
@@ -812,7 +813,7 @@ class Trainer:
                 #     outputs[("sample", frame_id, scale)],
                 #     padding_mode="border", align_corners=True)
                 
-                outputs[("color", frame_id, scale)] = F.grid_sample(
+                outputs[("color_aug", frame_id, scale)] = F.grid_sample(
                     inputs[("color_aug", frame_id, source_scale)],
                     outputs[("sample", frame_id, scale)],
                     padding_mode="border", align_corners=True)
@@ -855,9 +856,7 @@ class Trainer:
             losses["depth_loss/{}".format(0)] = disc_loss
             
             # how far is it from CT
-            
-            
-                
+
         if self.opt.pre_trained_generator:
             
             image = self.gen_transform(inputs[("color", 0, 0)])
@@ -910,7 +909,7 @@ class Trainer:
             target = inputs[("color_aug", 0, source_scale)]
 
             for frame_id in self.opt.frame_ids[1:]:
-                pred = outputs[("color", frame_id, scale)]
+                pred = outputs[("color_aug", frame_id, scale)]
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target))
 
             reprojection_losses = torch.cat(reprojection_losses, 1)

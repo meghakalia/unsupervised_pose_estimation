@@ -146,7 +146,7 @@ for z in range(1, 5):
     # gauss_number =  1 + np.random.randint(2, 5, size= 1)
     gauss_number =  2
 
-    experiment_name = "4_combinedframe_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
+    experiment_name = "gauss_addition_combinedframe_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
     # wandb 
     config = dict(
         height = height,
@@ -281,7 +281,7 @@ for z in range(1, 5):
     step = 0
     start_time = time.time()
     step = 1
-    save_frequency = 1
+    save_frequency = 20
     custom_step = 0
     prev_error = 100000000
     for  epoch in range(num_epochs):
@@ -320,7 +320,7 @@ for z in range(1, 5):
                 sigma_out2               = models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
                 gaussian_mask2           = models["gaussian2"](sigma_out2)
                 
-                outputs['compose'] = outputs['decompose'] * gaussian_mask1[0] * gaussian_mask2[0]
+                outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0] + gaussian_mask2[0])
                 
                 
                 if not train_unet_only:
@@ -331,7 +331,7 @@ for z in range(1, 5):
                     sigma_out2               = models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
                     gaussian_mask2           = models["gaussian2"](sigma_out2)
                     
-                    outputs['compose'] = outputs['decompose'] * gaussian_mask1[0] * gaussian_mask2[0]
+                    outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0] + gaussian_mask2[0])
                     
                     # if not bool_multi_gauss:
                     #     if same_gauss_kernel:
