@@ -117,7 +117,7 @@ for z in range(1, 5):
     
 # frac = 0.45
     file_dir = os.path.dirname(__file__)  # the directory that options.py resides in
-    load_model = True 
+    load_model = False 
     # data loader
     models = {}
     input_size = ()
@@ -230,7 +230,7 @@ for z in range(1, 5):
     model_lr_scheduler = optim.lr_scheduler.StepLR(model_optimizer, scheduler_step_size, 0.1)
 
     if load_model:
-        load_model_fxn('/code/code/3_combinedframe_recon_pretrained_trainable_dataaug_True_gauss_num_2_batchnorm_True_ssim_l1_0.55_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_19', ["decompose", "sigma1", "sigma2", "gaussian1", "gaussian2"], models)
+        load_model_fxn('/code/code/3_combinedframe_recon_pretrained_trainable_dataaug_True_gauss_num_2_batchnorm_True_ssim_l1_0.55_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_19', ["decompose"], models)
         
     # dataloader 
     datasets_dict = {"endovis": datasets.LungRAWDataset}
@@ -322,16 +322,16 @@ for z in range(1, 5):
                 
                 outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0] + gaussian_mask2[0])
                 
-                
-                if not train_unet_only:
+                # this should be commented out
+                # if not train_unet_only:
                     
-                    sigma_out1               = models['sigma1'](features[0]) # will spit out 5, 1 gaussian std 
-                    gaussian_mask1           = models["gaussian1"](sigma_out1)
+                #     sigma_out1               = models['sigma1'](features[0]) # will spit out 5, 1 gaussian std 
+                #     gaussian_mask1           = models["gaussian1"](sigma_out1)
                     
-                    sigma_out2               = models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
-                    gaussian_mask2           = models["gaussian2"](sigma_out2)
+                #     sigma_out2               = models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
+                #     gaussian_mask2           = models["gaussian2"](sigma_out2)
                     
-                    outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0] + gaussian_mask2[0])
+                #     outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0] + gaussian_mask2[0])
                     
                     # if not bool_multi_gauss:
                     #     if same_gauss_kernel:
@@ -346,8 +346,8 @@ for z in range(1, 5):
                     #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0]
                         
                         
-                else:
-                    outputs['compose'] = outputs['decompose']
+                # else:
+                #     outputs['compose'] = outputs['decompose']
 
                 losses = compute_reprojection_loss(outputs['compose'], inputs["color_aug", frame_id, 0], frac)
                 total_loss['l1']+=losses['l1']

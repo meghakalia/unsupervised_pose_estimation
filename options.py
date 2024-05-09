@@ -225,7 +225,7 @@ class MonodepthOptions:
                                  nargs="+",
                                  type=str,
                                  help="models to load",
-                                 default = ["decompose", "sigma1", "sigma2", "gaussian1", "gaussian2"] )
+                                 default = ["decompose", 'sigma1', 'sigma2'] )
                               #    default=["pose_encoder", "pose", "depth", "encoder"])
                               #    default=["position_encoder", "position"])
 

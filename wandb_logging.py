@@ -46,9 +46,9 @@ class wandb_logging:
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
         if experiment_name:
-            wandb.init(project="gauss_decompose patchGAN_discriminator_prior", config=self.config, dir = 'data/logs')
+            wandb.init(project="gauss_decompose_train_end2end", config=self.config, dir = 'data/logs')
         else:
-            wandb.init(project="gauss_decompose patchGAN_discriminator_prior", config=self.config, dir = 'data/logs', name = experiment_name)
+            wandb.init(project="gauss_decompose_train_end2end", config=self.config, dir = 'data/logs', name = experiment_name)
         
         self.save_colored_depth = False
         
@@ -116,6 +116,7 @@ class wandb_logging:
                 image_list = []
                 caption_list = []
                 image_list_depth = []
+                image_list_original = []
                 image_list_automask = []
                 image_list_color = []
                 image_list_pred_color = []
@@ -153,14 +154,18 @@ class wandb_logging:
                     else:
                         image_list.append(outputs[("disp", s)][:4,:,:]) # first 4 images of the images
                         
+                        
+                        if ("original_aug", 0, s) in outputs:
+                            image_list_original.append(outputs[("original_aug", 0, s)][:4,:,:])
+                            
                         if ("depth", 0, s) in outputs:
                             image_list_depth.append(outputs[("depth", 0, s)][:4,:,:])
                         
                         if "identity_selection/{}".format(s) in outputs:
                             image_list_automask.append(outputs["identity_selection/{}".format(s)][:4,:,:]*255)
                         
-                        if ("color", frame_id, s) in outputs:
-                            image_list_pred_color.append(outputs[("color", frame_id, s)][:4,:,:])
+                        if ("color_aug_compose", frame_id, s) in outputs:
+                            image_list_pred_color.append(outputs[("color_aug_compose", frame_id, s)][:4,:,:])
                             
                         if use_discriminator_loss:
                             # disc reponse 
@@ -177,6 +182,13 @@ class wandb_logging:
                     c = torch.concat(image_list, 0)
                     self.log_image_grid(mode = mode, image_list = c, scale = s, caption = ' ', character = ''.join((character,"{}".format(s))), step = step)
                     
+                    if len(image_list_original) > 0:
+                        c_original = torch.concat(image_list_original, 0)
+                        img_grid = torchvision.utils.make_grid(c_original, normalize = True)
+                        npimg = img_grid.permute(1, 2, 0).cpu().numpy()
+                        self.log_single_image(''.join((mode,str(s),'original_aug_')), image = npimg, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('original_aug_')), step=step)
+                        
+                    
                     c_depth = torch.concat(image_list_depth, 0)
                     img_grid = torchvision.utils.make_grid(c_depth, normalize = True)
                     npimg = img_grid.permute(1, 2, 0).cpu().numpy()
@@ -188,8 +200,9 @@ class wandb_logging:
                     c_automask = c_automask[:, None, :, :]
                     self.log_image_grid(mode = mode, image_list = c_automask, scale = s, caption = 'automask_ ', character = ''.join((character,"{}".format(s))), step = step)
                     
-                    c_pred_color = torch.concat(image_list_pred_color, 0)
-                    self.log_image_grid(mode = mode, image_list = c_pred_color, scale = s, caption = 'pred_color ', character = ''.join((character,"{}".format(s))), step = step)
+                    if len(image_list_pred_color) > 0:
+                        c_pred_color = torch.concat(image_list_pred_color, 0)
+                        self.log_image_grid(mode = mode, image_list = c_pred_color, scale = s, caption = 'pred_color ', character = ''.join((character,"{}".format(s))), step = step)
 
                     if use_discriminator_loss:
                         c_discriminator_response = torch.concat(image_disc_response, 0)
@@ -214,16 +227,16 @@ class wandb_logging:
                         npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
                         self.log_single_image(''.join((mode,str(s),'decompose_gauss_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('decompose_gauss_')), step=step)
                         
-                        c_discriminator_response = torch.concat(gaussian_response['reconstructed'], 2)
-                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
-                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
-                        self.log_single_image(''.join((mode,str(s),'image_compose_gauss_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('image_compose_gauss_')), step=step)
+                        # c_discriminator_response = torch.concat(gaussian_response['reconstructed'], 2)
+                        # img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                        # npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                        # self.log_single_image(''.join((mode,str(s),'image_compose_gauss_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('image_compose_gauss_')), step=step)
                         
-                        c_discriminator_response = torch.concat(gaussian_response['original'], 2)
-                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
-                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
-                        self.log_single_image(''.join((mode,str(s),'original_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('original_')), step=step)
-                # row = len(image_list), 
+                #         c_discriminator_response = torch.concat(gaussian_response['original'], 2)
+                #         img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                #         npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                #         self.log_single_image(''.join((mode,str(s),'original_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('original_')), step=step)
+                # # row = len(image_list), 
                 
                 # row = len(image_list), 
                 # row = len(image_list), 
