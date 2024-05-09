@@ -28,8 +28,8 @@ class wandb_logging:
         self.config.update({'scaled_pose':"False"})
         self.config.update({'scaled_depth':"False"})
         self.config.update({'discLoss_depth_space':"True"})
+        self.config.update({'corrected_color_aug_inLoss':"True"})
         self.config.update({'up_scaled_intermediate_depths_discriminator':"True"})
-        
         
         # self.config = dict(
         # height = self.opts.height,

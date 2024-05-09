@@ -687,13 +687,13 @@ class Trainer:
                         pose_inputs = [pose_feats[0], pose_feats[f_i]]
 
                     if self.opt.pose_model_type == "separate_resnet":
-                        pose_inputs = [self.models["pose_encoder"](torch.cat(pose_inputs, 1))]
+                        pose_inputs = [self.models["pose_encoder"](torch.cat(pose_inputs, 1))] # [it is : -1, 0, 1]
                     elif self.opt.pose_model_type == "posecnn":
                         pose_inputs = torch.cat(pose_inputs, 1)
 
-                    axisangle, translation = self.models["pose"](pose_inputs)
-                    outputs[("axisangle", 0, f_i)] = axisangle
-                    outputs[("translation", 0, f_i)] = translation
+                    axisangle, translation              = self.models["pose"](pose_inputs)
+                    outputs[("axisangle", 0, f_i)]      = axisangle
+                    outputs[("translation", 0, f_i)]    = translation
 
                     # Invert the matrix if the frame id is negative
                     outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
@@ -769,6 +769,7 @@ class Trainer:
             if self.opt.v1_multiscale:
                 source_scale = scale
             else:
+                # upscaling disparities
                 disp = F.interpolate(
                     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
                 source_scale = 0
@@ -798,6 +799,7 @@ class Trainer:
                     T = transformation_from_parameters(
                         axisangle[:, 0], translation[:, 0] * mean_inv_depth[:, 0], frame_id < 0)
 
+                # backprojecting at zero scale only
                 cam_points = self.backproject_depth[source_scale](
                     depth, inputs[("inv_K", source_scale)])
                 pix_coords = self.project_3d[source_scale](
@@ -805,14 +807,23 @@ class Trainer:
 
                 outputs[("sample", frame_id, scale)] = pix_coords
 
+                # outputs[("color", frame_id, scale)] = F.grid_sample(
+                #     inputs[("color", frame_id, source_scale)],
+                #     outputs[("sample", frame_id, scale)],
+                #     padding_mode="border", align_corners=True)
+                
                 outputs[("color", frame_id, scale)] = F.grid_sample(
-                    inputs[("color", frame_id, source_scale)],
+                    inputs[("color_aug", frame_id, source_scale)],
                     outputs[("sample", frame_id, scale)],
                     padding_mode="border", align_corners=True)
 
+                # if not self.opt.disable_automasking:
+                #     outputs[("color_identity", frame_id, scale)] = \
+                #         inputs[("color", frame_id, source_scale)]
+                        
                 if not self.opt.disable_automasking:
                     outputs[("color_identity", frame_id, scale)] = \
-                        inputs[("color", frame_id, source_scale)]
+                        inputs[("color_aug", frame_id, source_scale)]
 
     def compute_reprojection_loss(self, pred, target):
         """Computes reprojection loss between a batch of predicted and target images
@@ -892,8 +903,11 @@ class Trainer:
                 source_scale = 0
 
             disp = outputs[("disp", scale)]
-            color = inputs[("color", 0, scale)]
-            target = inputs[("color", 0, source_scale)]
+            # color = inputs[("color", 0, scale)]
+            # target = inputs[("color", 0, source_scale)]
+            
+            color = inputs[("color_aug", 0, scale)]
+            target = inputs[("color_aug", 0, source_scale)]
 
             for frame_id in self.opt.frame_ids[1:]:
                 pred = outputs[("color", frame_id, scale)]
@@ -905,7 +919,8 @@ class Trainer:
             if not self.opt.disable_automasking:
                 identity_reprojection_losses = []
                 for frame_id in self.opt.frame_ids[1:]:
-                    pred = inputs[("color", frame_id, source_scale)]
+                    # pred = inputs[("color", frame_id, source_scale)]
+                    pred = inputs[("color_aug", frame_id, source_scale)]
                     identity_reprojection_losses.append(
                         self.compute_reprojection_loss(pred, target))
 
