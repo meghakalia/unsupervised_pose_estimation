@@ -20,10 +20,10 @@ class GaussianLayer(nn.Module):
         # self.sigma = nn.Parameter(torch.rand(1))
         # self.gauss_layer  = gkern(input_size, self.sigma)
         
-        self.sigmax = nn.Parameter(torch.rand(1))
-        self.sigmay = nn.Parameter(torch.rand(1))
-        self.meanx = nn.Parameter(torch.rand(1))
-        self.meany = nn.Parameter(torch.rand(1))
+        # self.sigmax = nn.Parameter(torch.rand(1))
+        # self.sigmay = nn.Parameter(torch.rand(1))
+        # self.meanx = nn.Parameter(torch.rand(1))
+        # self.meany = nn.Parameter(torch.rand(1))
         
    
     def gaussian_fn(self, M, std, mean):

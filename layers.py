@@ -299,6 +299,26 @@ class deconv(nn.Module):
         return out
 
 
+def get_smooth_loss_gauss_mask(disp, img, gauss_mask):
+    """Computes the smoothness loss for a disparity image
+    The color image is used for edge-aware smoothness
+    """
+    grad_disp_x = torch.abs(disp[:, :, :, :-1] - disp[:, :, :, 1:])
+    grad_disp_y = torch.abs(disp[:, :, :-1, :] - disp[:, :, 1:, :])
+
+    # weighted mean
+    grad_img_x = torch.mean(torch.abs(img[:, :, :, :-1] - img[:, :, :, 1:])*gauss_mask, 1, keepdim=True)/gauss_mask.sum()
+    grad_img_y = torch.mean(torch.abs(img[:, :, :-1, :] - img[:, :, 1:, :])*gauss_mask, 1, keepdim=True)/gauss_mask.sum()
+
+    grad_disp_x *= torch.exp(-grad_img_x)
+    grad_disp_y *= torch.exp(-grad_img_y)
+
+    
+    # take weighted mean 
+    grad_disp_x*=gauss_mask
+    grad_disp_y*=gauss_mask
+    
+    return grad_disp_x.mean()/gauss_mask.sum() + grad_disp_y.mean()/gauss_mask.sum()
 
 def get_smooth_loss(disp, img):
     """Computes the smoothness loss for a disparity image

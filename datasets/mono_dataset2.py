@@ -99,8 +99,8 @@ class MonoDataset(data.Dataset):
 
         self.transforms_aug = transforms.Compose([
                 transforms.ColorJitter(self.brightness, self.contrast, self.saturation, self.hue),
-                transforms.RandomAutocontrast(),
                 transforms.RandomHorizontalFlip(p=0.5),
+                # transforms.RandomAutocontrast()
                 # transforms.RandomAutocontrast()
                 # transforms.RandomRotation(degrees = 30)
                 ])
