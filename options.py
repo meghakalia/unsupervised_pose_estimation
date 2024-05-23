@@ -52,7 +52,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--gaussian_correction",
                                  help="if set, will do enable gaussian correction",
-                                 action="store_false")# false
+                                 action="store_true")# false
 
         # TRAINING options
         self.parser.add_argument("--pre_trained_generator",
@@ -61,12 +61,12 @@ class MonodepthOptions:
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="4gauss_aug_train")
+                                 default="4gauss_mask")
         
         self.parser.add_argument("--split",
                                  type=str,
