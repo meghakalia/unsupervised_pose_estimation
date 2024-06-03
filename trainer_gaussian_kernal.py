@@ -133,7 +133,7 @@ for z in range(1, 5):
     models = {}
     input_size = ()
     learning_rate = 10e-07 # original is 10e-06
-    batch_size = 16
+    batch_size = 4
     num_epochs = 25
     parameters_to_train = []
     train_unet_only = False
@@ -157,7 +157,7 @@ for z in range(1, 5):
     # gauss_number =  1 + np.random.randint(2, 5, size= 1)
     gauss_number =  1
 
-    experiment_name = "4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
+    experiment_name = "4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
     # wandb 
     config = dict(
         height = height,
@@ -304,6 +304,7 @@ for z in range(1, 5):
     save_frequency = 20
     custom_step = 0
     prev_error = 100000000
+    prev_fid = 100000
     for  epoch in range(num_epochs):
         print("Training")
         
@@ -404,7 +405,7 @@ for z in range(1, 5):
             total_loss['reprojection_loss']/=3
             total_loss['ssim_loss']/=3
             total_fid['fid']/=3
-                
+            
             model_optimizer.zero_grad()
             total_loss['reprojection_loss'].backward()
             # losses['reprojection_loss'].backward()
@@ -421,10 +422,10 @@ for z in range(1, 5):
             #     prev_error = losses['reprojection_loss']
             
             # save model
-            if total_loss['reprojection_loss'] < prev_error: 
+            if total_fid['fid'] < prev_fid: 
                 # save_model 
                 save_model(epoch, 'code/{}'.format(experiment_name), models, model_optimizer)
-                prev_error = total_loss['reprojection_loss']
+                prev_fid = total_fid['fid']
             
             # wand_b loggin 
             if ( step + 1) %  save_frequency == 0:

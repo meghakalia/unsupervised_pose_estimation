@@ -40,6 +40,9 @@ def parse_args():
                         help="normal or shared",
                         default="separate_resnet",
                         choices=["posecnn", "separate_resnet", "shared"])
+    parser.parser.add_argument("--enable_gauss_mask",
+                        help="weighing the loss with gauss mask",
+                        action="store_false")
     
     return parser.parse_args()
 
@@ -118,6 +121,7 @@ def test_simple(args):
     pose_decoder_model.load_state_dict(pose_decoder_dict)
     pose_decoder_model.to(device)
     pose_decoder_model.eval()
+    
     
     # FINDING INPUT IMAGES
     if os.path.isfile(args.image_path):

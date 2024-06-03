@@ -63,13 +63,15 @@ class DepthDecoder(nn.Module):
         x = input_features[-1]
         for i in range(4, -1, -1):
             x = self.convs[("upconv", i, 0)](x)
-            x = [self.convs[("deconv", i, 0)](x)]
+            x = [upsample(x)]
+            # x = [self.convs[("deconv", i, 0)](x)]
             if self.use_skips and i > 0:
                 x += [input_features[i - 1]]
             x = torch.cat(x, 1)
             x = self.convs[("upconv", i, 1)](x)
             if self.batch_norm:
                 x = self.bn[('bn', i)].cuda()(x)
+            
                 
             # batchnorm 
             if i in self.scales:

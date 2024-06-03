@@ -48,25 +48,29 @@ class MonodepthOptions:
         
         self.parser.add_argument("--write_split_file",
                                  help="if set, will do the train-val split and write in a file",
-                                 action="store_true")# false
+                                 action="store_false")# false
         
         self.parser.add_argument("--gaussian_correction",
                                  help="if set, will do enable gaussian correction",
-                                 action="store_true")# false
+                                 action="store_false")# false
 
         # TRAINING options
+        self.parser.add_argument("--use_euler",
+                                 help="whether euler or axis angle",
+                                 action="store_false")
+        
         self.parser.add_argument("--pre_trained_generator",
                                  help="whether pretrained gan is on or off ",
                                  action="store_true")
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="4gauss_mask")
+                                 default="with_euler_rot_uncertainty")
         
         self.parser.add_argument("--split",
                                  type=str,
@@ -223,12 +227,13 @@ class MonodepthOptions:
                                  # default = None, 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
-                                 default = '/code/code/4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_True_gauss_num_1_batchnorm_True_ssim_l1_0.65_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_20',
+                                 default = '/code/code/4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_True_gauss_num_1_batchnorm_True_ssim_l1_0.65_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_23',
                                  help="name of model to load")
         self.parser.add_argument("--models_to_load",
                                  nargs="+",
                                  type=str,
                                  help="models to load",
+                                 # default = None)
                                  default = ["decompose", 'sigma_combined', 'gaussian1'] )
                               #    default=["pose_encoder", "pose", "depth", "encoder"])
                               #    default=["position_encoder", "position"])

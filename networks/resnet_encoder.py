@@ -31,6 +31,9 @@ class ResNetMultiImageInput(models.ResNet):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        
+        
+        
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -53,7 +56,8 @@ def resnet_multiimage_input(num_layers, pretrained=False, num_input_images=1):
     model = ResNetMultiImageInput(block_type, blocks, num_input_images=num_input_images)
 
     if pretrained:
-        loaded = torch.utils.model_zoo.load_url(ResNet50_Weights.IMAGENET1K_V1.url)
+        # loaded = torch.utils.model_zoo.load_url(ResNet50_Weights.IMAGENET1K_V1.url)
+        loaded = torch.utils.model_zoo.load_url(ResNet18_Weights.IMAGENET1K_V1.url)
         # loaded = model_zoo.load_url(models.resnet.model_urls['resnet{}'.format(num_layers)])
         loaded['conv1.weight'] = torch.cat(
             [loaded['conv1.weight']] * num_input_images, 1) / num_input_images
@@ -85,6 +89,9 @@ class ResnetEncoder(nn.Module):
 
         if num_layers > 34:
             self.num_ch_enc[1:] *= 4
+        
+        self.drop = True
+        self.dropout = torch.nn.Dropout(p=0.4)
 
     def forward(self, input_image):
         self.features = []
@@ -93,9 +100,15 @@ class ResnetEncoder(nn.Module):
         x = self.encoder.conv1(x)
         x = self.encoder.bn1(x)
         self.features.append(self.encoder.relu(x))
-        self.features.append(self.encoder.layer1(self.encoder.maxpool(self.features[-1])))
-        self.features.append(self.encoder.layer2(self.features[-1]))
-        self.features.append(self.encoder.layer3(self.features[-1]))
-        self.features.append(self.encoder.layer4(self.features[-1]))
-
+        if self.drop:
+            self.features.append(self.encoder.layer1(self.encoder.maxpool(self.features[-1])))
+            self.features.append(self.encoder.layer2(self.dropout(self.features[-1])))
+            self.features.append(self.encoder.layer3(self.dropout(self.features[-1])))
+            self.features.append(self.encoder.layer4(self.dropout(self.features[-1])))
+        else:
+            self.features.append(self.encoder.layer1(self.encoder.maxpool(self.features[-1])))
+            self.features.append(self.encoder.layer2((self.features[-1])))
+            self.features.append(self.encoder.layer3((self.features[-1])))
+            self.features.append(self.encoder.layer4((self.features[-1])))
+            
         return self.features

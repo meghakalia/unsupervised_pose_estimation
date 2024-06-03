@@ -46,9 +46,9 @@ class wandb_logging:
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
         if experiment_name:
-            wandb.init(project="gauss_decompose_train_end2end", config=self.config, dir = 'data/logs')
+            wandb.init(project="traning_eulerAngle", config=self.config, dir = 'data/logs')
         else:
-            wandb.init(project="gauss_decompose_train_end2end", config=self.config, dir = 'data/logs', name = experiment_name)
+            wandb.init(project="traning_eulerAngle", config=self.config, dir = 'data/logs', name = experiment_name)
         
         self.save_colored_depth = False
         
@@ -154,6 +154,8 @@ class wandb_logging:
                     else:
                         image_list.append(outputs[("disp", s)][:4,:,:]) # first 4 images of the images
                         
+                        if ("color", 1, s) in outputs:
+                            image_list_original.append(outputs[("color", 1, s)][:4,:,:])
                         
                         if ("original_aug", 0, s) in outputs:
                             image_list_original.append(outputs[("original_aug", 0, s)][:4,:,:])
@@ -212,30 +214,34 @@ class wandb_logging:
                         
                     if gaussian_decomposition:
                          
-                        c_discriminator_response = torch.concat(gaussian_response['gaussian_mask1'], 2)
-                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
-                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
-                        self.log_single_image(''.join((mode,str(s),'gauss1_response_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('gauss1_response_')), step=step)
+                        if 'gaussian_mask1' in gaussian_response:
+                            c_discriminator_response = torch.concat(gaussian_response['gaussian_mask1'], 2)
+                            img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                            npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                            self.log_single_image(''.join((mode,str(s),'gauss1_response_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('gauss1_response_')), step=step)
+                            
+                        if 'gaussian_mask2' in gaussian_response:
+                            c_discriminator_response = torch.concat(gaussian_response['gaussian_mask2'], 2)
+                            img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                            npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                            self.log_single_image(''.join((mode,str(s),'gauss2_response_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('gauss2_response_')), step=step)
                         
-                        c_discriminator_response = torch.concat(gaussian_response['gaussian_mask2'], 2)
-                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
-                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
-                        self.log_single_image(''.join((mode,str(s),'gauss2_response_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('gauss2_response_')), step=step)
-                        
-                        c_discriminator_response = torch.concat(gaussian_response['decomposed'], 2)
-                        img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
-                        npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
-                        self.log_single_image(''.join((mode,str(s),'decompose_gauss_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('decompose_gauss_')), step=step)
-                        
+                        if 'decomposed' in gaussian_response:
+                            c_discriminator_response = torch.concat(gaussian_response['decomposed'], 2)
+                            img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                            npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                            self.log_single_image(''.join((mode,str(s),'decompose_gauss_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('decompose_gauss_')), step=step)
+                            
                         # c_discriminator_response = torch.concat(gaussian_response['reconstructed'], 2)
                         # img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
                         # npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
                         # self.log_single_image(''.join((mode,str(s),'image_compose_gauss_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('image_compose_gauss_')), step=step)
                         
-                #         c_discriminator_response = torch.concat(gaussian_response['original'], 2)
-                #         img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
-                #         npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
-                #         self.log_single_image(''.join((mode,str(s),'original_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('original_')), step=step)
+                        if 'original' in gaussian_response and len(gaussian_response['original']) > 0:
+                            c_discriminator_response = torch.concat(gaussian_response['original'], 2)
+                            img_grid_disc_res = torchvision.utils.make_grid(c_discriminator_response, normalize = True)
+                            npimg_disc = img_grid_disc_res.permute(1, 2, 0).cpu().numpy()
+                            self.log_single_image(''.join((mode,str(s),'original_')), image = npimg_disc, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('original_')), step=step)
                 # # row = len(image_list), 
                 
                 # row = len(image_list), 
