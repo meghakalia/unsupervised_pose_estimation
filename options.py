@@ -52,7 +52,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--gaussian_correction",
                                  help="if set, will do enable gaussian correction",
-                                 action="store_false")# false
+                                 action="store_true")# false
 
         # TRAINING options
         self.parser.add_argument("--use_euler",
@@ -65,12 +65,12 @@ class MonodepthOptions:
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="with_euler_rot_uncertainty")
+                                 default="correct_zero_padding_with_euler_gaussian_mask_uncertainty")
         
         self.parser.add_argument("--split",
                                  type=str,

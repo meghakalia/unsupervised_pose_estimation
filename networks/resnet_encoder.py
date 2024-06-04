@@ -91,7 +91,7 @@ class ResnetEncoder(nn.Module):
             self.num_ch_enc[1:] *= 4
         
         self.drop = True
-        self.dropout = torch.nn.Dropout(p=0.4)
+        self.dropout = torch.nn.Dropout(p=0.2)
 
     def forward(self, input_image):
         self.features = []
