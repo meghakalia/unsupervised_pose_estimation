@@ -797,6 +797,7 @@ class Trainer:
         for key, ipt in inputs.items():
             inputs[key] = ipt.to(self.device)
         
+        # here I want to calculate
         features = self.models["encoder"](inputs["color_aug", 0, 0])
         outputs = self.models["depth"](features)
         
@@ -1216,7 +1217,7 @@ class Trainer:
                 outputs[("color", frame_id, scale)] = F.grid_sample(
                     inputs[("color_aug", frame_id, source_scale)],
                     outputs[("sample", frame_id, scale)],
-                    padding_mode="zeros", align_corners=True) # chaneg padding_mode="zeros"
+                    padding_mode="border", align_corners=True) # chaneg padding_mode="zeros"
 
 
                 

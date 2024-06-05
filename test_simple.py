@@ -11,6 +11,7 @@ import matplotlib.cm as cm
 import cv2
 import torch
 from torchvision import transforms, datasets
+from torchvision.utils import save_image
 # from options_eval import MonodepthEvalOptions
 
 import networks
@@ -26,8 +27,17 @@ def parse_args():
     parser.add_argument('--image_path', type=str,
                         help='path to a test image or folder of images',
                         default = 'data/dataset_14/keyframe_1')
+    parser.add_argument('--output_dir', type=str,
+                        help='path to a test image or folder of images',
+                        default = 'data/dataset_14/keyframe_1/results')
+    
+    parser.add_argument('--output_folderName', type=str,
+                        help='path to a test image or folder of images',
+                        default = 'correct_zero_padding_with_euler_gaussian_mask_uncertainty_0.0001')
+    
     parser.add_argument('--model_path', type=str,
-                        help='path to the test model', default ='/code/data/models_depth_scaled/mdp/models/weights_9') #models_pretrained/Model_MIA")
+                        # help='path to the test model', default ='/code/data/models_depth_scaled/mdp/models/weights_9') #models_pretrained/Model_MIA")
+                        help='path to the test model', default ='/code/data/models_disc_prior_logging/correct_zero_padding_with_euler_gaussian_mask_uncertainty_0.0001/models/weights_19') #models_pretrained/Model_MIA")
 
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="png")
@@ -40,8 +50,13 @@ def parse_args():
                         help="normal or shared",
                         default="separate_resnet",
                         choices=["posecnn", "separate_resnet", "shared"])
-    parser.parser.add_argument("--enable_gauss_mask",
+    parser.add_argument("--enable_gauss_mask",
                         help="weighing the loss with gauss mask",
+                        action="store_false")
+    
+    
+    parser.add_argument("--enable_uncertainty_estimation",
+                        help="creates an unceratinty mask alon with depth images",
                         action="store_false")
     
     return parser.parse_args()
@@ -60,7 +75,6 @@ def sample_filenames_frequency(filenames, sampling_frequency):
     return outputfilenames
 
 def test_simple(args):
-    
     
     """Function to predict for a single image or folder of images
     """
@@ -101,7 +115,34 @@ def test_simple(args):
 
     depth_decoder.to(device)
     depth_decoder.eval()
-
+    
+    # gauss 
+    if args.enable_gauss_mask:
+        models = {}
+        models['decompose'] = networks.UNet(3, 3)
+        
+        models['sigma_combined'] = networks.FCN(output_size = 16) # 4 sigma and mu x 3 for 3 gaussians
+        models['gaussian{}'.format(1)] = networks.GaussianLayer(192)
+        
+        models['decompose'].to(device)
+        models['sigma_combined'].to(device)
+        models['gaussian{}'.format(1)].to(device)
+        
+        # train gaussian 
+        
+        
+        for n in ['decompose', 'gaussian1', 'sigma_combined']:
+            print("Loading {} weights...".format(n))
+            path = os.path.join(args.model_path, "{}.pth".format(n))
+            model_dict = models[n].state_dict()
+            pretrained_dict = torch.load(path)
+            pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+            model_dict.update(pretrained_dict)
+            models[n].load_state_dict(model_dict)
+        
+        models['decompose'].eval()
+        models['sigma_combined'].eval()
+        models['gaussian{}'.format(1)].eval()
     
     # # pose # loading
     pose_encoder = networks.ResnetEncoder(18,num_input_images=2, pretrained = 1)
@@ -135,6 +176,11 @@ def test_simple(args):
     else:
         raise Exception("Can not find args.image_path: {}".format(args.image_path))
 
+    output_directory = os.path.join(args.output_dir, args.output_folderName)
+    
+    if not os.path.isdir(output_directory):
+        os.makedirs(output_directory)
+        
     # new paths based on sampling_frequency 
     paths = sample_filenames_frequency(paths, sampling_frequency = 3)
 
@@ -162,12 +208,82 @@ def test_simple(args):
                 input_image1 = input_image1.resize((feed_width, feed_height), pil.LANCZOS)
                 input_image1 = transforms.ToTensor()(input_image1).unsqueeze(0).to(device)
                 inputs_all = [input_image, input_image1]
+                
+            gauss_mask_combined = []
+            if args.enable_gauss_mask:
+                # get a mask around images 
+                
+                # get the mask on two images and then multiply try on only one image
+                features      = models["decompose"](input_image) # no augmentation for validation 
+                decomposed    = features[1]
+                
+                sigma_out_combined        = models['sigma_combined'](features[0]) # will spit out 5, 1 gaussian std 
+                gaussian_mask1            = models["gaussian1"](sigma_out_combined[:, :4])
+                gaussian_mask2            = models["gaussian1"](sigma_out_combined[:, 4:8])
+                gaussian_mask3            = models["gaussian1"](sigma_out_combined[:, 8:12])
+                gaussian_mask4            = models["gaussian1"](sigma_out_combined[:, 12:16])
+                
+                gauss_mask_combined.append(gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
             
+                mask = torch.cat(gauss_mask_combined, 1) # for only one image
+                
+                mask[mask < 0.6] = 0
+                mask_t = torch.ones(input_image.shape).cuda()
+                mask_t[mask == 0] = 0
+                input_image=input_image*mask_t
+                
+                
             # PREDICTION
             # input_image = input_image.to(device)
             features = encoder(input_image)
             outputs = depth_decoder(features)
 
+            if args.enable_uncertainty_estimation:
+                encoder.train()
+                depth_decoder.train()
+                
+                outputs_combine = []
+                for run_count in range(5):
+                    features = encoder(input_image)
+                    outputs = depth_decoder(features)
+                    
+                    # disparity 
+                    disp = outputs[("disp", 0)]
+                    # outputs_combine.append(disp_to_depth_no_scaling(disp))
+                    outputs_combine.append(disp)
+                    
+                # std 
+                c = torch.concat(outputs_combine, 0)
+                std_img = torch.std(c, dim=0, keepdim=True)
+                
+                std_img[std_img < 0.009] = 0 # check the min max values before threholding
+                std_img_np = std_img.squeeze().cpu().numpy()
+                # save mask 
+                normalizer = mpl.colors.Normalize(vmin=std_img_np.min(), vmax=std_img_np.max()) # 归一化到0-1
+                mapper = cm.ScalarMappable(norm=normalizer, cmap='cool') # colormap
+                colormapped_im = (mapper.to_rgba(std_img_np)[:, :, :3] * 255).astype(np.uint8)
+                # display the map 
+  
+                im = pil.fromarray(colormapped_im)
+                output_name = os.path.splitext(os.path.basename(image_path))[0]
+                name_std = os.path.join(output_directory, "{}_std.png".format(output_name))
+                im.save(name_std, quality=95)
+                
+                # # save disparity image as well 
+                # disp_resized_np = disp.squeeze().cpu().numpy()
+                # vmax = np.percentile(disp_resized_np, 95)
+
+                # normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax) # 归一化到0-1
+                # mapper = cm.ScalarMappable(norm=normalizer, cmap='magma') # colormap
+                # colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
+
+                # im = pil.fromarray(colormapped_im)
+                # im.save("disparity.jpeg", quality=95)
+                
+                # # original image 
+                # save_image(input_image, 'input_image.png')
+           
+       
             disp = outputs[("disp", 0)]
             disp_resized = disp
             # disp_resized = torch.nn.functional.interpolate(

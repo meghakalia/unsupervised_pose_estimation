@@ -6,7 +6,7 @@ import networks
 import numpy as np
 import math
 from torch.utils.data import DataLoader
-from layers import transformation_from_parameters
+from layers import transformation_from_parameters_euler # transformation_from_parameters
 from utils import readlines
 from options_eval import MonodepthEvalOptions
 from datasets import LungRAWDataset
@@ -14,7 +14,7 @@ from torchvision.utils import save_image
 import matplotlib.pyplot as plt
 import matplotlib
 
-matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
+# matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
 
 def sample_filenames_frequency(filenames, sampling_frequency):
     outputfilenames = []
@@ -152,7 +152,7 @@ def plotTrajectory(pred_poses, gt_local_poses, save_fig = False, name = 0):
     if save_fig:
         plt.savefig('weights_forfrankie12_{}.png'.format(name),dpi=600)
     
-    # plt.show()
+    plt.show()
     
     plt.clf()
      # distance plot 
@@ -198,12 +198,12 @@ def evaluate(opt):
     #     os.path.join(os.path.dirname(__file__), "splits", "scared",
     #                  "test_files_phantom14.txt"))[0:50]
     
-    num = 13
-    for traj in range(12,15):
+    num = 14
+    for traj in range(18,19):
         filenames_1 = readlines(
             os.path.join(os.path.dirname(__file__), "splits", "endovis",
                         "test_files_phantom_{}.txt".format(num)))
-        filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)
+        filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)[:50]
         
         # filenames = filenames_1
         # dataset = SCAREDRAWDataset(opt.data_path, filenames, opt.height, opt.width,
@@ -221,7 +221,7 @@ def evaluate(opt):
         
         # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,pin_memory=False, drop_last=False)
         # model_path = opt.load_weights_folder[:-2] + str(traj)
-        model_path = opt.load_weights_folder
+        model_path        = opt.load_weights_folder[:-2] + str(traj)
         pose_encoder_path = os.path.join(model_path, "pose_encoder.pth")
         pose_decoder_path = os.path.join(model_path, "pose.pth")
 
@@ -270,8 +270,6 @@ def evaluate(opt):
             models['sigma_combined'].eval()
             models['gaussian{}'.format(1)].eval()
             
-
-        
         if opt.enable_gauss_mask:
             # gauss_parameters_to_train = []
             
@@ -319,12 +317,12 @@ def evaluate(opt):
                 for key, ipt in inputs.items():
                     inputs[key] = ipt.cuda()
                 
-                frame1 = inputs[("color", 1, 0)]
-                frame2 = inputs[("color", 0, 0)]
+                frame1 = inputs[("color", 0, 0)]
+                frame2 = inputs[("color", 1, 0)]
                 
                 if opt.enable_gauss_mask:
                     gauss_mask_combined = []
-                    for frame_id in opt.frame_ids:
+                    for frame_id in [0, 1]:
                         features      = models["decompose"](inputs["color", frame_id, 0]) # no augmentation for validation 
                         decomposed    = features[1]
                         
@@ -336,16 +334,19 @@ def evaluate(opt):
                         
                         gauss_mask_combined.append(gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
                     
-                    mask = torch.cat(gauss_mask_combined, 1).sum(1)/(len(opt.frame_ids)*3) # len(opt.frame_ids)*3
+                    mask = torch.cat(gauss_mask_combined, 1).sum(1)/(len(opt.frame_ids)*2) # len(opt.frame_ids)*3
                     
-                    mask[mask < 0.7] = 0
+                    mask[mask < 0.6] = 0
+                    mask = mask[:, None, :, :]
+                    mask_t = torch.ones(mask.shape).cuda()
+                    mask_t[mask == 0] = 0
                     
-                    frame1 = frame1*mask[:,None, :, :]
-                    frame2 = frame2*mask[:,None, :, :]
+                    frame1 = frame1*mask_t
+                    frame2 = frame2*mask_t
                     
                 if opt.gaussian_correction:
                     # first pass the inputs through the decompose neteowk
-                    features      = models["decompose"](inputs[("color", 1, 0)]) # no augmentation for validation 
+                    features  = models["decompose"](inputs[("color", 1, 0)]) # no augmentation for validation 
                     frame1    = features[1]
                     
                     features      = models["decompose"](inputs[("color", 0, 0)]) # no augmentation for validation 
@@ -361,39 +362,40 @@ def evaluate(opt):
                 # translation_.append(translation[:, 0].cpu().numpy())
 
                 pred_poses.append(
-                    transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().numpy())
+                    transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0]).cpu().numpy())
                 
         # if want to save
         # np.savez('pose_prediction_{}.npz'.format(num), pred_poses)
         # np.savez('axisangle_{}.npz'.format(num), axisangle_)
         # np.savez('translation_{}.npz'.format(num), translation_)
+        
         pred_poses = np.concatenate(pred_poses)
 
         # change length here. 
         gt_path = os.path.join(os.path.dirname(__file__), "splits", "endovis", "gt_poses_phantom_{}.npz".format(num))
-        gt_local_poses = np.load(gt_path, fix_imports=True, encoding='latin1')["data"]
+        gt_local_poses = np.load(gt_path, fix_imports=True, encoding='latin1')["data"][:50]
 
         plotTrajectory(pred_poses, gt_local_poses, True, name = traj)
-        ates = []
-        res = []
-        # num_frames = gt_local_poses.shape[0]
-        num_frames = pred_poses.shape[0] - 3
-        track_length = 5
-        count = 0 
-        for i in range(0, num_frames - 1):
-            local_xyzs = np.array(dump_xyz(pred_poses[i:i + track_length - 1]))
-            gt_local_xyzs = np.array(dump_xyz(gt_local_poses[i:i + track_length - 1]))
-            local_rs = np.array(dump_r(pred_poses[i:i + track_length - 1]))
-            gt_rs = np.array(dump_r(gt_local_poses[i:i + track_length - 1]))
-            # if i + track_length - 1 > 50:
-            #     print('here')
-            # print(i + track_length - 1)
+    ates = []
+    res = []
+    # num_frames = gt_local_poses.shape[0]
+    num_frames = pred_poses.shape[0] - 3
+    track_length = 5
+    count = 0 
+    for i in range(0, num_frames - 1):
+        local_xyzs = np.array(dump_xyz(pred_poses[i:i + track_length - 1]))
+        gt_local_xyzs = np.array(dump_xyz(gt_local_poses[i:i + track_length - 1]))
+        local_rs = np.array(dump_r(pred_poses[i:i + track_length - 1]))
+        gt_rs = np.array(dump_r(gt_local_poses[i:i + track_length - 1]))
+        # if i + track_length - 1 > 50:
+        #     print('here')
+        # print(i + track_length - 1)
 
-            ates.append(compute_ate(gt_local_xyzs, local_xyzs))
-            res.append(compute_re(local_rs, gt_rs))
-            
-        print("\n   Trajectory error: {:0.4f}, std: {:0.4f}\n".format(np.mean(ates), np.std(ates)))
-        print("\n   Rotation error: {:0.4f}, std: {:0.4f}\n".format(np.mean(res), np.std(res)))
+        ates.append(compute_ate(gt_local_xyzs, local_xyzs))
+        res.append(compute_re(local_rs, gt_rs))
+        
+    print("\n   Trajectory error: {:0.4f}, std: {:0.4f}\n".format(np.mean(ates), np.std(ates)))
+    print("\n   Rotation error: {:0.4f}, std: {:0.4f}\n".format(np.mean(res), np.std(res)))
 
     # get the error
     # save the image 
