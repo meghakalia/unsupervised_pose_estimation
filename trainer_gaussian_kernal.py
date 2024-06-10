@@ -40,6 +40,36 @@ from torchmetrics.image.fid import FrechetInceptionDistance
 
 fid_criterion = FrechetInceptionDistance(feature = 64, normalize=True).to('cuda')
 
+def discriminator_train_step(inputs, prediction):
+        
+        # real image 
+        # outputs : Predicted 
+        # for key, ipt in inputs.items():
+        #     inputs[key] = ipt.to(device)
+            
+        # backpropagate through discriminator
+        Discriminator.train()
+        optimizer_Discriminator.zero_grad()
+
+        ct_loss_disc = Discriminator(inputs)
+        loss_real = criterion_Discriminator(ct_loss_disc, valid)
+        
+        loss_fake = 0 
+
+        depth_disc_res = Discriminator(prediction.detach())
+        loss_fake+=criterion_Discriminator(depth_disc_res, fake)
+            
+        # Total loss
+        loss_D = (loss_real + loss_fake) / 2
+
+        loss_D.backward()
+        
+        optimizer_Discriminator.step()
+        
+        Discriminator.eval()
+       
+        return loss_D
+    
 # 0.25 - 0.95
 # losses 
 def compute_reprojection_loss(pred, target, frac = 0.45):
@@ -53,12 +83,26 @@ def compute_reprojection_loss(pred, target, frac = 0.45):
     ssim_loss = ssim(pred, target).mean(1).mean(-1).mean(-1)
     reprojection_loss = (1.0 - frac)* ssim_loss + frac * l1_loss
     
+    if discriminator:
+        Discriminator.eval()
+        output_disc = Discriminator(pred) # this may not be correct because of the scale. check whether we want to miniize disp or depth
+        disc_loss = criterion_Discriminator(output_disc, valid)
+        losses["discriminator"] = disc_loss
+        
+
     # reprojection_loss = l1_loss
     
     losses['l1'] = l1_loss.mean(-1)
     # losses['ssim_loss'] = 0
-    losses['reprojection_loss'] = reprojection_loss.mean(-1)
+    if discriminator:
+        losses['reprojection_loss'] = reprojection_loss.mean(-1)
+    else:
+        losses['reprojection_loss'] = reprojection_loss.mean(-1) + disc_loss
+        
     losses['ssim_loss'] = ssim_loss.mean(-1)
+    
+    
+        
     
     return losses
 
@@ -132,7 +176,7 @@ for z in range(1, 5):
     # data loader
     models = {}
     input_size = ()
-    learning_rate = 10e-07 # original is 10e-06
+    learning_rate = 10e-08 # original is 10e-06
     batch_size = 4
     num_epochs = 25
     parameters_to_train = []
@@ -151,13 +195,20 @@ for z in range(1, 5):
     scheduler_step_size = 8
     bool_multi_gauss = True
     separate_mean_std = True
+    discriminator = True
     same_gauss_kernel = False # if all images have same gaussian profile
     batch_norm = True 
     data_aug = True
     # gauss_number =  1 + np.random.randint(2, 5, size= 1)
     gauss_number =  1
+    
+    free_mask = False
+    
+    discriminator_lr = 0.0002
+    b1               = 0.5
+    b2               = 0.999
 
-    experiment_name = "4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
+    experiment_name = "discriminator_batch_4_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
     # wandb 
     config = dict(
         height = height,
@@ -186,26 +237,36 @@ for z in range(1, 5):
         
         if separate_mean_std: 
             models['sigma_combined'] = networks.FCN(output_size = 16) # 4 sigma and mu x 3 for 3 gaussians
+            
+            if free_mask:
+                models['free_mask'] = networks.FCN_free_mask(output_size = 3) # 3 different masks for each of channels
             # models['gaussian'] = networks.GaussianLayer(height)
             
             for g in range(1, gauss_number+1): 
                 models['sigma{}'.format(g)] = networks.FCN(output_size = 10) # 4 for each of std x, std y, mean x , mean y, two for the mixture of gaussians 
                 models['gaussian{}'.format(g)] = networks.GaussianLayer(height)
-                
-                # models['sigma{}.format(g)'] = networks.FCN(output_size = 4) # 4 for each of std x, std y, mean x , mean y
-                # models['gaussian.format(g)'] = networks.GaussianLayer(height)
-            
-        # if bool_multi_gauss:
-        #     models['sigma'] = networks.FCN(output_size = 5) 
-        #     models['gaussian'] = networks.GaussianLayer(height, num_of_gaussians = 5)
-        # else:
-        #     models['sigma'] = networks.FCN(output_size = 4) # 4 for each of std x, std y, mean x , mean y
-        #     models['gaussian'] = networks.GaussianLayer(height)
-
-
         
+        if discriminator:
+            criterion_Discriminator = torch.nn.BCEWithLogitsLoss()
+            
+            input_shape = (3, width, height)
+            # define a discriminator to give feedback on every patch. 
+            Discriminator = networks.Discriminator(input_shape)
+            Discriminator.to(device)
+            
+            # Adversarial ground truths
+            #  valid = Variable(Tensor(np.ones((real_A.size(0), *D_A2.output_shape))), requires_grad=False)
+            valid = torch.ones((1, *Discriminator.output_shape), requires_grad=False).repeat([batch_size, 1, 1, 1]).to(device)
+            fake = torch.zeros((1, *Discriminator.output_shape), requires_grad=False).repeat([batch_size, 1, 1, 1]).to(device)
+            
+            optimizer_Discriminator = torch.optim.Adam(Discriminator.parameters(), lr=discriminator_lr, betas=(b1, b2))
+            
+            
     models['decompose'].to(device)
     models['sigma_combined'].to(device)
+    if free_mask:
+        models['free_mask'].to(device)
+    
     # models['gaussian'].to(device)
 
     if not train_unet_only:
@@ -221,6 +282,8 @@ for z in range(1, 5):
 
     parameters_to_train += list(models["decompose"].parameters())
     parameters_to_train += list(models['sigma_combined'].parameters())
+    if free_mask:
+        parameters_to_train += list(models['free_mask'].parameters())
     # parameters_to_train += list(models['gaussian'].parameters())
 
     for g in range(1, gauss_number+1): 
@@ -329,8 +392,14 @@ for z in range(1, 5):
                 
             before_op_time = time.time()
 
-            total_loss = {'reprojection_loss':0, 'l1': 0, 'ssim_loss':0}
+         
+            if discriminator:
+                total_loss = {'reprojection_loss':0, 'l1': 0, 'ssim_loss':0, 'discriminator':0}
+            else:
+                total_loss = {'reprojection_loss':0, 'l1': 0, 'ssim_loss':0}
+
             total_fid = {'fid':0}
+            
             
             #fcn model output mixture proportions too 
             for frame_id in [0, -1, 1]:
@@ -348,55 +417,23 @@ for z in range(1, 5):
                 # gaussian_mask2            = models["gaussian2"](sigma_out_combined[:, 4:8])
                 # gaussian_mask3            = models["gaussian3"](sigma_out_combined[:, 8:12])
                 
-                # 
-                
                 # outputs['compose'] = outputs['decompose'] * (sigma_out_combined[:,12][:,None, None, None]/3*gaussian_mask1[0] + sigma_out_combined[:,13][:,None, None, None]/3*gaussian_mask2[0] +sigma_out_combined[:,14][:,None, None, None]/3*gaussian_mask3[0])
                 
                 outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
-                
-                # sigma_out1               = models['sigma1'](features[0]) # will spit out 5, 1 gaussian std 
-                # gaussian_mask1           = models["gaussian1"](sigma_out1[:, :4])
-                
-                # sigma_out2               = models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
-                # gaussian_mask2           = models["gaussian2"](sigma_out2[:,:4])
-                
-                # sigma_out3               = models['sigma3'](features[0]) # will spit out 5, 1 gaussian std 
-                # gaussian_mask3           = models["gaussian3"](sigma_out3[:,:4])
-                
-                # outputs['compose'] = outputs['decompose'] * (sigma_out1[:,-1][:,None, None, None]/3*gaussian_mask1[0] + sigma_out2[:,-1][:,None, None, None]/3*gaussian_mask2[0] +sigma_out3[:,-1][:,None, None, None]/3*gaussian_mask3[0])
-                
-                # this should be commented out
-                # if not train_unet_only:
-                    
-                #     sigma_out1               = models['sigma1'](features[0]) # will spit out 5, 1 gaussian std 
-                #     gaussian_mask1           = models["gaussian1"](sigma_out1)
-                    
-                #     sigma_out2               = models['sigma2'](features[0]) # will spit out 5, 1 gaussian std 
-                #     gaussian_mask2           = models["gaussian2"](sigma_out2)
-                    
-                #     outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0] + gaussian_mask2[0])
-                    
-                    # if not bool_multi_gauss:
-                    #     if same_gauss_kernel:
-                    #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0].repeat(16,1,1,1)
-                    #     else:
-                    #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0]
-                    # else:
-                    #     if same_gauss_kernel:
-                    #         # output of gauss should be : 5 x 1
-                    #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0].repeat(16,1,1,1)
-                    #     else:
-                    #         outputs['compose'] = outputs['decompose'] * gaussian_mask[0]
-                        
-                        
-                # else:
-                #     outputs['compose'] = outputs['decompose']
 
+                if discriminator: 
+                    discriminator_train_step(inputs["color_aug", frame_id, 0], outputs['compose'])
+                
                 losses = compute_reprojection_loss(outputs['compose'], inputs["color_aug", frame_id, 0], frac)
+                
                 total_loss['l1']+=losses['l1']
                 total_loss['reprojection_loss']+=losses['reprojection_loss']
                 total_loss['ssim_loss']+=losses['ssim_loss']
                 
+                if discriminator:
+                    total_loss['discriminator']+=losses['discriminator']
+                    
+
                 total_fid['fid']+=evaluation_FID(fid_criterion, inputs["color_aug", frame_id, 0], outputs['compose'])
                 # total_fid['fid']+=computeFID(inputs["color", frame_id, 0], outputs['compose'], fid_criterion)
             
@@ -405,6 +442,9 @@ for z in range(1, 5):
             total_loss['reprojection_loss']/=3
             total_loss['ssim_loss']/=3
             total_fid['fid']/=3
+            
+            if discriminator:
+                total_loss['discriminator']/=3
             
             model_optimizer.zero_grad()
             total_loss['reprojection_loss'].backward()

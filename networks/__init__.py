@@ -9,4 +9,4 @@ from .unet import UNet, UNet_instanceNorm
 
 from .gaussian import GaussianLayer
 
-from .fcn import FCN
+from .fcn import FCN, FCN_free_mask

@@ -85,35 +85,37 @@ class FCN(nn.Module):
 
     def forward(self, x):
         return self.model(x)
+
+        return self.model(x)
+
+
+class FCN_free_mask(nn.Module):
+    
+    def __init__(self, output_size = 3):
+        super(FCN_free_mask, self).__init__()
+
+        base_channels = 512
         
-        # x = self.conv1(x)
-        # # x = nn.BatchNorm2d(x.shape[1]).to('cuda')(x)
-        # x = self.normalization1(x)
-        # x = self.nonlinear(x)
-        # x = self.dropout(x)
+        self.up1 = (Up(base_channels, base_channels//2, bilinear = True))# self.base_filter*16, self.base_filter*8
+        self.up2 = (Up(base_channels//2, base_channels//4, bilinear = True))# self.base_filter*8, self.base_filter*4
+        self.up3 = (Up(base_channels//4, base_channels//8, bilinear = True))# self.base_filter*4, self.base_filter*2
+        self.up4 = (Up(base_channels//8, base_channels//16, bilinear = True)) # self.base_filter*2, self.base_filter*1
+        self.outc = (OutConv(self.base_filter, output_size))
         
-        # x = self.conv2(x)
-        # x = self.normalization2(x)
-        # x = self.nonlinear(x)
-        # x = self.dropout(x)
-        
-        # x = self.conv3(x)
-        # x = self.normalization3(x)
-        # x = self.nonlinear(x)
-        # x = self.dropout(x)
-        
-        # x = self.flatten(x)
-        # x = self.linear1(x)
-        # x = self.nonlinear(x)
-        
-        # x = self.linear2(x)
-        # x = self.nonlinear(x)
-        
-        # x = self.linear3(x)
-        # # x = nn.Linear(x.shape[0], self.ouput_size).to('cuda')(x.transpose(0,1))
-        # # x = self.relu(x)
-        
-        # x = self.sigmoid(x)
-        
+        self.sigmoid = nn.Sigmoid().to('cuda')
+      
+        self.model = nn.Sequential(
+            self.up1,
+            self.up2, 
+            self.up3, 
+            self.up4,
+            self.sigmoid
+        )
+            
+
+    def forward(self, x):
         return self.model(x)
     
+
+
+

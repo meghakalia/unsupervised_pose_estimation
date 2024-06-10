@@ -283,8 +283,8 @@ def transformation_from_parameters(axisangle, translation, invert=False):
 def transformation_from_parameters_euler(euler, translation, invert=False):
     """Convert the network's (axisangle, translation) output into a 4x4 matrix
     """
-    R = torch.transpose(euler_angles_to_matrix(euler, 'ZYX'), 0, 1).permute(1, 0, 2) # to match with scipy euler = -euler and transpose of this 
-    # R = (euler_angles_to_matrix(euler, 'ZYX')) # to match with scipy euler = -euler and transpose of this 
+    # R = torch.transpose(euler_angles_to_matrix(euler, 'ZYX'), 0, 1).permute(1, 0, 2) # to match with scipy euler = -euler and transpose of this 
+    R = (euler_angles_to_matrix(euler, 'ZYX')) # to match with scipy euler = -euler and transpose of this 
     t = translation.clone()
 
     if invert:

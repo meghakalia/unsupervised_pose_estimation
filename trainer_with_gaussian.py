@@ -794,6 +794,8 @@ class Trainer:
         return outputs, losses
     
     def process_batch_reverse(self, inputs):
+        
+        # calculate the pose in opposite direction and cos loss 
         for key, ipt in inputs.items():
             inputs[key] = ipt.to(self.device)
         
@@ -1217,7 +1219,7 @@ class Trainer:
                 outputs[("color", frame_id, scale)] = F.grid_sample(
                     inputs[("color_aug", frame_id, source_scale)],
                     outputs[("sample", frame_id, scale)],
-                    padding_mode="border", align_corners=True) # chaneg padding_mode="zeros"
+                    padding_mode="border", align_corners=True) 
 
 
                 
