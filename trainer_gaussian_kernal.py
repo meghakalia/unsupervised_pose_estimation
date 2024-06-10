@@ -40,6 +40,24 @@ from torchmetrics.image.fid import FrechetInceptionDistance
 
 fid_criterion = FrechetInceptionDistance(feature = 64, normalize=True).to('cuda')
 
+def compute_disc_loss(inputs, prediction):
+    # backpropagate through discriminator
+        Discriminator.train()
+        optimizer_Discriminator.zero_grad()
+
+        ct_loss_disc = Discriminator(inputs)
+        loss_real = criterion_Discriminator(ct_loss_disc, valid)
+        
+        loss_fake = 0 
+
+        depth_disc_res = Discriminator(prediction)
+        loss_fake+=criterion_Discriminator(depth_disc_res, fake)
+        
+        # Total loss
+        loss_D = (loss_real + loss_fake) / 2
+        
+        return loss_D
+    
 def discriminator_train_step(inputs, prediction):
         
         # real image 
@@ -56,7 +74,7 @@ def discriminator_train_step(inputs, prediction):
         
         loss_fake = 0 
 
-        depth_disc_res = Discriminator(prediction.detach())
+        depth_disc_res = Discriminator(prediction)
         loss_fake+=criterion_Discriminator(depth_disc_res, fake)
             
         # Total loss
@@ -95,9 +113,9 @@ def compute_reprojection_loss(pred, target, frac = 0.45):
     losses['l1'] = l1_loss.mean(-1)
     # losses['ssim_loss'] = 0
     if discriminator:
-        losses['reprojection_loss'] = reprojection_loss.mean(-1)
+        losses['reprojection_loss'] = reprojection_loss.mean(-1) + losses["discriminator"]
     else:
-        losses['reprojection_loss'] = reprojection_loss.mean(-1) + disc_loss
+        losses['reprojection_loss'] = reprojection_loss.mean(-1) 
         
     losses['ssim_loss'] = ssim_loss.mean(-1)
     
@@ -394,7 +412,8 @@ for z in range(1, 5):
 
          
             if discriminator:
-                total_loss = {'reprojection_loss':0, 'l1': 0, 'ssim_loss':0, 'discriminator':0}
+                total_loss = {'reprojection_loss':0, 'l1': 0, 'ssim_loss':0, 'discriminator':0, 'discriminator_train':0}
+                
             else:
                 total_loss = {'reprojection_loss':0, 'l1': 0, 'ssim_loss':0}
 
@@ -422,7 +441,7 @@ for z in range(1, 5):
                 outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
 
                 if discriminator: 
-                    discriminator_train_step(inputs["color_aug", frame_id, 0], outputs['compose'])
+                    total_loss['discriminator_train']+=compute_disc_loss(inputs["color_aug", frame_id, 0], outputs['compose'].detach())
                 
                 losses = compute_reprojection_loss(outputs['compose'], inputs["color_aug", frame_id, 0], frac)
                 
@@ -431,7 +450,7 @@ for z in range(1, 5):
                 total_loss['ssim_loss']+=losses['ssim_loss']
                 
                 if discriminator:
-                    total_loss['discriminator']+=losses['discriminator']
+                    total_loss['discriminator']=total_loss['discriminator']+losses['discriminator']
                     
 
                 total_fid['fid']+=evaluation_FID(fid_criterion, inputs["color_aug", frame_id, 0], outputs['compose'])
@@ -439,18 +458,27 @@ for z in range(1, 5):
             
             # for 3 frames
             total_loss['l1']/=3
-            total_loss['reprojection_loss']/=3
+            total_loss['reprojection_loss']=total_loss['reprojection_loss']/3
             total_loss['ssim_loss']/=3
             total_fid['fid']/=3
             
+
             if discriminator:
-                total_loss['discriminator']/=3
+                total_loss['discriminator']=total_loss['discriminator']/3
             
             model_optimizer.zero_grad()
             total_loss['reprojection_loss'].backward()
             # losses['reprojection_loss'].backward()
             model_optimizer.step()
 
+            
+            # discriminator train step
+            if discriminator:
+                total_loss['discriminator_train']/=3
+                total_loss['discriminator_train'].backward()
+                optimizer_Discriminator.step() 
+                Discriminator.eval()
+                
             duration = time.time() - before_op_time
             
             step+=1

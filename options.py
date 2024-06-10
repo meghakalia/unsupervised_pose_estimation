@@ -180,6 +180,11 @@ class MonodepthOptions:
         self.parser.add_argument("--v1_multiscale",
                                  help="if set, uses monodepth v1 multiscale",
                                  action="store_true")
+        
+        self.parser.add_argument("--optical_flow",
+                                 help="optical flow",
+                                 action="store_true")
+        
         self.parser.add_argument("--avg_reprojection",
                                  help="if set, uses average reprojection loss",
                                  action="store_true")
