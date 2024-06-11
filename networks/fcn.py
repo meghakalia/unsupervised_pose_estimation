@@ -86,7 +86,7 @@ class FCN(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-        return self.model(x)
+
 
 
 class FCN_free_mask(nn.Module):
@@ -100,7 +100,7 @@ class FCN_free_mask(nn.Module):
         self.up2 = (Up(base_channels//2, base_channels//4, bilinear = True))# self.base_filter*8, self.base_filter*4
         self.up3 = (Up(base_channels//4, base_channels//8, bilinear = True))# self.base_filter*4, self.base_filter*2
         self.up4 = (Up(base_channels//8, base_channels//16, bilinear = True)) # self.base_filter*2, self.base_filter*1
-        self.outc = (OutConv(self.base_filter, output_size))
+        self.outc = (OutConv(base_channels//16, output_size))
         
         self.sigmoid = nn.Sigmoid().to('cuda')
       

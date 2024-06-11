@@ -47,7 +47,7 @@ class GaussianLayer(nn.Module):
         gkern1d_y = self.gaussian_fn(kernlen, std=stdy, mean = meany)
         gkern2d = torch.outer(gkern1d_x, gkern1d_y)
         gkern2d = gkern2d[None, :, :]
-        gkern2d = gkern2d.expand(3, kernlen, kernlen)
+        # gkern2d = gkern2d.expand(3, kernlen, kernlen)
         return gkern2d
     
     def combine_gaussians(self):

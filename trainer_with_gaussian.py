@@ -136,10 +136,32 @@ class Trainer:
                 self.optimizer_Discriminator = torch.optim.Adam(self.Discriminator.parameters(), lr=self.opt.discriminator_lr, betas=(self.opt.b1, self.opt.b2))
         
         if self.opt.optical_flow:
+            self.models["position_encoder"] = networks.ResnetEncoder(
+            self.opt.num_layers, self.opt.weights_init == "pretrained", num_input_images=2)  # 18
+            self.models["position_encoder"].to(self.device)
+
+            self.models["position"] = networks.PositionDecoder(
+                self.models["position_encoder"].num_ch_enc, self.opt.scales)
+            self.models["position"].to(self.device)
+            
+            self.parameters_to_train += list(self.models["position_encoder"].parameters())
+            self.parameters_to_train += list(self.models["position"].parameters())
+            
+            self.spatial_transform = SpatialTransformer((self.opt.height, self.opt.width))
+            self.spatial_transform.to(self.device)
+
+            self.get_occu_mask_backward = get_occu_mask_backward((self.opt.height, self.opt.width))
+            self.get_occu_mask_backward.to(self.device)
+
+            self.get_occu_mask_bidirection = get_occu_mask_bidirection((self.opt.height, self.opt.width))
+            self.get_occu_mask_bidirection.to(self.device)
+            
             for scale in self.opt.scales:
                 self.position_depth[scale] = optical_flow((h, w), self.opt.batch_size, h, w)
                 self.position_depth[scale].to(self.device)
-            
+                
+                
+        
         if self.opt.enable_gauss_mask:
             
             self.resize_transform = {}
@@ -998,35 +1020,24 @@ class Trainer:
                         outputs_1 = self.models["position"](position_inputs_reverse)
                         
                         for scale in self.opt.scales:
-                            
+                            # optical flow at every scale 
                             # check forward backward occlussion masks 
                             outputs[("position", scale, f_i)] = outputs_0[("position", scale)]
                             outputs[("position", "high", scale, f_i)] = F.interpolate(
                                 outputs[("position", scale, f_i)], [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
                             
-                            # change spatial transformer 
+                            # change spatial transformer # shoudl this be equalivalent to the next frame ?
                             outputs[("registration", scale, f_i)] = self.spatial_transform(inputs[("color", f_i, 0)], outputs[("position", "high", scale, f_i)])
 
                             outputs[("position_reverse", scale, f_i)] = outputs_1[("position", scale)]
                             outputs[("position_reverse", "high", scale, f_i)] = F.interpolate(
                                 outputs[("position_reverse", scale, f_i)], [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+                            
                             outputs[("occu_mask_backward", scale, f_i)],  outputs[("occu_map_backward", scale, f_i)]= self.get_occu_mask_backward(outputs[("position_reverse", "high", scale, f_i)])
                             outputs[("occu_map_bidirection", scale, f_i)] = self.get_occu_mask_bidirection(outputs[("position", "high", scale, f_i)],
                                                                                                             outputs[("position_reverse", "high", scale, f_i)])
                             
-                            # transform
-                            transform_input = [outputs[("registration", 0, f_i)], inputs[("color", 0, 0)]]
-                            transform_inputs = self.models["transform_encoder"](torch.cat(transform_input, 1))
-                            outputs_2 = self.models["transform"](transform_inputs)
-
-                            for scale in self.opt.scales:
-
-                                outputs[("transform", scale, f_i)] = outputs_2[("transform", scale)]
-                                outputs[("transform", "high", scale, f_i)] = F.interpolate(
-                                    outputs[("transform", scale, f_i)], [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
-                                outputs[("refined", scale, f_i)] = (outputs[("transform", "high", scale, f_i)] * outputs[("occu_mask_backward", 0, f_i)].detach()  + inputs[("color", 0, 0)])
-                                outputs[("refined", scale, f_i)] = torch.clamp(outputs[("refined", scale, f_i)], min=0.0, max=1.0)
-                            
+                   
                             
                     if self.opt.pose_model_type == "separate_resnet":
                         pose_inputs = [self.models["pose_encoder"](torch.cat(pose_inputs, 1))]
