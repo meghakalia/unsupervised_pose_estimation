@@ -107,13 +107,12 @@ def compute_reprojection_loss(pred, target, frac = 0.45):
         disc_loss = criterion_Discriminator(output_disc, valid)
         losses["discriminator"] = disc_loss
         
-
     # reprojection_loss = l1_loss
     
     losses['l1'] = l1_loss.mean(-1)
     # losses['ssim_loss'] = 0
     if discriminator:
-        losses['reprojection_loss'] = reprojection_loss.mean(-1) + 0.2*losses["discriminator"]
+        losses['reprojection_loss'] = reprojection_loss.mean(-1) + 0.09*losses["discriminator"]
     else:
         losses['reprojection_loss'] = reprojection_loss.mean(-1) 
         
@@ -226,7 +225,7 @@ for z in range(1, 5):
     b1               = 0.5
     b2               = 0.999
 
-    experiment_name = "free_form_mask_{}_discriminator__{}_batch_4_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(free_mask, discriminator, data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
+    experiment_name = "2D_gauss_discriminator_{}_batch_4_dataaug_{}_gauss_num_{}_batchnorm_{}_ssim_l1_{}_sigma_network_gauss_combination{}_same_gausskernel_{}_separatemeanstd_{}".format(free_mask, discriminator, data_aug, gauss_number, batch_norm, frac, bool_multi_gauss, same_gauss_kernel, separate_mean_std)
     # wandb 
     config = dict(
         height = height,
@@ -254,7 +253,7 @@ for z in range(1, 5):
     if not train_unet_only: 
         
         if separate_mean_std: 
-            models['sigma_combined'] = networks.FCN(output_size = 24) # 4 sigma and mu x 3 for 3 gaussians
+            models['sigma_combined'] = networks.FCN(output_size = 16) # 4 sigma and mu x 3 for 3 gaussians
             
             if free_mask:
                 models['free_mask'] = networks.FCN_free_mask(output_size = 3) # 3 different masks for each of channels
@@ -278,6 +277,7 @@ for z in range(1, 5):
             fake = torch.zeros((1, *Discriminator.output_shape), requires_grad=False).repeat([batch_size, 1, 1, 1]).to(device)
             
             optimizer_Discriminator = torch.optim.Adam(Discriminator.parameters(), lr=discriminator_lr, betas=(b1, b2))
+            disc_model_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_Discriminator, 5, 0.1)
             
             
     models['decompose'].to(device)
@@ -427,6 +427,7 @@ for z in range(1, 5):
             
             #fcn model output mixture proportions too 
             for frame_id in [0, -1, 1]:
+                # change to hsv 
                 features                = models["decompose"](inputs["color_aug", frame_id, 0])
                 outputs['decompose']    = features[1]
                 
@@ -438,8 +439,8 @@ for z in range(1, 5):
                 gaussian_mask2            = models["gaussian1"](sigma_out_combined[:, 4:8])
                 gaussian_mask3            = models["gaussian1"](sigma_out_combined[:, 8:12])
                 gaussian_mask4            = models["gaussian1"](sigma_out_combined[:, 12:16])
-                gaussian_mask5            = models["gaussian1"](sigma_out_combined[:, 16:20])
-                gaussian_mask6            = models["gaussian1"](sigma_out_combined[:, 20:24])
+                # gaussian_mask5            = models["gaussian1"](sigma_out_combined[:, 16:20])
+                # gaussian_mask6            = models["gaussian1"](sigma_out_combined[:, 20:24])
                 
                 # gaussian_mask3            = models["gaussian1"](sigma_out_combined[:, :4])
                 
@@ -451,10 +452,10 @@ for z in range(1, 5):
                 if free_mask:  
                     outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0]/5 + gaussian_mask2[0]/5 + gaussian_mask3[0]/5 + gaussian_mask4[0]/5 + free_mask_image/5)
                 else:
-                    # outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
-                    gauss_1 = torch.cat([gaussian_mask1[0], gaussian_mask2[0], gaussian_mask3[0]], 1)
-                    gauss_2 = torch.cat([gaussian_mask4[0], gaussian_mask5[0], gaussian_mask6[0]], 1)
-                    outputs['compose'] = outputs['decompose'] * (gauss_1/2 + gauss_2/2)
+                    outputs['compose'] = outputs['decompose'] * (gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
+                    # gauss_1 = torch.cat([gaussian_mask1[0], gaussian_mask2[0], gaussian_mask3[0]], 1)
+                    # gauss_2 = torch.cat([gaussian_mask4[0], gaussian_mask5[0], gaussian_mask6[0]], 1)
+                    # outputs['compose'] = outputs['decompose'] * (gauss_1/2 + gauss_2/2)
                     
                     
 
@@ -530,30 +531,30 @@ for z in range(1, 5):
                     image               = features_val[1]
                     if not train_unet_only: 
                         sigma_out_val1                = models['sigma_combined'](features[0]) # will spit out 5, 1 gaussian std 
-                        # gaussian_mask_val1            = models["gaussian1"](sigma_out_combined[:, :4])
-                        # gaussian_mask_val2            = models["gaussian1"](sigma_out_combined[:, 4:8])
-                        
-                        # gaussian_mask_val3            = models["gaussian1"](sigma_out_combined[:, 8:12])
-                        # gaussian_mask_val4            = models["gaussian1"](sigma_out_combined[:, 12:16])
-
                         gaussian_mask_val1            = models["gaussian1"](sigma_out_combined[:, :4])
                         gaussian_mask_val2            = models["gaussian1"](sigma_out_combined[:, 4:8])
+                        
                         gaussian_mask_val3            = models["gaussian1"](sigma_out_combined[:, 8:12])
                         gaussian_mask_val4            = models["gaussian1"](sigma_out_combined[:, 12:16])
-                        gaussian_mask_val5            = models["gaussian1"](sigma_out_combined[:, 16:20])
-                        gaussian_mask_val6            = models["gaussian1"](sigma_out_combined[:, 20:24])
+
+                        # gaussian_mask_val1            = models["gaussian1"](sigma_out_combined[:, :4])
+                        # gaussian_mask_val2            = models["gaussian1"](sigma_out_combined[:, 4:8])
+                        # gaussian_mask_val3            = models["gaussian1"](sigma_out_combined[:, 8:12])
+                        # gaussian_mask_val4            = models["gaussian1"](sigma_out_combined[:, 12:16])
+                        # gaussian_mask_val5            = models["gaussian1"](sigma_out_combined[:, 16:20])
+                        # gaussian_mask_val6            = models["gaussian1"](sigma_out_combined[:, 20:24])
                 
                         if free_mask:
                             models['free_mask'].eval()
-                            free_mask_image = models['free_mask'](features[0])     
+                            free_mask_image = models['free_mask'](features[0])
                             final_val = image * (gaussian_mask_val1[0]/5 + gaussian_mask_val2[0]/5 + gaussian_mask_val3[0]/5 + gaussian_mask_val4[0]/5 + free_mask_image/5)
                             models['free_mask'].train()
                         else:
-                            # final_val = image * (gaussian_mask_val1[0]/4 + gaussian_mask_val2[0]/4 + gaussian_mask_val3[0]/4 + gaussian_mask_val4[0]/4)
+                            final_val = image * (gaussian_mask_val1[0]/4 + gaussian_mask_val2[0]/4 + gaussian_mask_val3[0]/4 + gaussian_mask_val4[0]/4)
                             
-                            gauss_1_val = torch.cat([gaussian_mask_val1[0], gaussian_mask_val2[0], gaussian_mask_val3[0]], 1)
-                            gauss_2_val = torch.cat([gaussian_mask_val4[0], gaussian_mask_val5[0], gaussian_mask_val5[0]], 1)
-                            final_val =image * (gauss_1_val/2 + gauss_2_val/2)
+                            # gauss_1_val = torch.cat([gaussian_mask_val1[0], gaussian_mask_val2[0], gaussian_mask_val3[0]], 1)
+                            # gauss_2_val = torch.cat([gaussian_mask_val4[0], gaussian_mask_val5[0], gaussian_mask_val5[0]], 1)
+                            # final_val =image * (gauss_1_val/2 + gauss_2_val/2)
                         
                         # final_val                     = image * (gaussian_mask_val1[0]/2 + gaussian_mask_val2[0])
                         # gaussian_mask_val3            = models["gaussian3"](sigma_out_combined[:, 8:12])
@@ -579,12 +580,12 @@ for z in range(1, 5):
                     
                     if not train_unet_only: 
                         wandb.log({"{}".format('train_reconstructed'):wandb.Image(make_grid(final_val), caption = 'reconstructed image'),'custom_step':custom_step})
-                        wandb.log({"{}".format('train_gaussmask1'):wandb.Image(make_grid(gauss_1_val), caption = 'gaussian mask1'),'custom_step':custom_step})
-                        wandb.log({"{}".format('train_gaussmask2'):wandb.Image(make_grid(gauss_2_val), caption = 'gaussian mask2'),'custom_step':custom_step})  
-                        # wandb.log({"{}".format('train_gaussmask1'):wandb.Image(make_grid(gaussian_mask_val1[0]), caption = 'gaussian mask1'),'custom_step':custom_step})
-                        # wandb.log({"{}".format('train_gaussmask2'):wandb.Image(make_grid(gaussian_mask_val2[0]), caption = 'gaussian mask2'),'custom_step':custom_step}) 
-                        # wandb.log({"{}".format('train_gaussmask3'):wandb.Image(make_grid(gaussian_mask_val3[0]), caption = 'gaussian mask3'),'custom_step':custom_step}) 
-                        # wandb.log({"{}".format('train_gaussmask4'):wandb.Image(make_grid(gaussian_mask_val4[0]), caption = 'gaussian mask4'),'custom_step':custom_step})    
+                        # wandb.log({"{}".format('train_gaussmask1'):wandb.Image(make_grid(gauss_1_val), caption = 'gaussian mask1'),'custom_step':custom_step})
+                        # wandb.log({"{}".format('train_gaussmask2'):wandb.Image(make_grid(gauss_2_val), caption = 'gaussian mask2'),'custom_step':custom_step})  
+                        wandb.log({"{}".format('train_gaussmask1'):wandb.Image(make_grid(gaussian_mask_val1[0]), caption = 'gaussian mask1'),'custom_step':custom_step})
+                        wandb.log({"{}".format('train_gaussmask2'):wandb.Image(make_grid(gaussian_mask_val2[0]), caption = 'gaussian mask2'),'custom_step':custom_step}) 
+                        wandb.log({"{}".format('train_gaussmask3'):wandb.Image(make_grid(gaussian_mask_val3[0]), caption = 'gaussian mask3'),'custom_step':custom_step}) 
+                        wandb.log({"{}".format('train_gaussmask4'):wandb.Image(make_grid(gaussian_mask_val4[0]), caption = 'gaussian mask4'),'custom_step':custom_step})    
                         # wandb.log({"{}".format('free_form_mask'):wandb.Image(make_grid(free_mask_image[0]), caption = 'free_form_mask4'),'custom_step':custom_step})   
                         
                     

@@ -263,8 +263,14 @@ class Trainer:
         datasets_dict = {"endovis": datasets.LungRAWDataset}
 
         self.dataset = datasets_dict[self.opt.dataset]
-
-        fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
+        
+        if self.opt.pose_prior: 
+            self.pose_criterion = nn.MSELoss()
+            
+        if self.opt.use_pose_prior:
+            fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5_pose_explicit.txt")
+        else:
+            fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
         
         train_filenames = readlines(fpath.format("train")) # exclude frame accordingly
         val_filenames = readlines(fpath.format("val"))
@@ -281,7 +287,7 @@ class Trainer:
 
         train_dataset = self.dataset(
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2271, sampling_frequency = self.sampling_frequency )
+            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2271, sampling_frequency = self.sampling_frequency, pose_prior = self.opt.pose_prior )
         
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
@@ -293,7 +299,7 @@ class Trainer:
         
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0, sampling_frequency = 2)
+            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0, sampling_frequency = 2, pose_prior = self.opt.pose_prior)
         
         # self.val_loader = DataLoader(
         #     val_dataset, self.opt.batch_size, True,
@@ -791,7 +797,7 @@ class Trainer:
                 # from the authors of https://arxiv.org/abs/1712.00175
                 if self.opt.pose_model_type == "posecnn":
 
-                    axisangle = outputs[("axisangle", 0, frame_id)]
+                    axisangle = outputs[("axisangle", 0, frame_id)] # change to euler # check 
                     translation = outputs[("translation", 0, frame_id)]
 
                     inv_depth = 1 / depth
@@ -847,7 +853,15 @@ class Trainer:
         total_loss = 0
         gan_loss = 0 
         disc_loss = 0 
-        gan_loss_total = 0 
+        gan_loss_total = 0
+        
+        if self.opt.pose_prior:
+            pose_loss = 0
+            for frame_id in [-1, 1]:
+                axisangle_trans_5 = torch.cat([outputs[("axisangle", 0, frame_id)][:2], outputs[("translation", 0, frame_id)]], 1)
+                prior_axisangle_trans_5 = torch.cat([inputs[('pose_prior', 1)][:2], inputs[('pose_prior', 1)][2:]], 1)
+                pose_loss+=self.pose_criterion(axisangle_trans_5, prior_axisangle_trans_5) # check this
+            
         if self.opt.adversarial_prior:
             # how far is the model from valid examples 
             self.Discriminator.eval()
@@ -981,7 +995,11 @@ class Trainer:
             losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
-        losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss
+        
+        if self.opt.pose_prior:
+            losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss + pose_loss
+        else:
+            losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):

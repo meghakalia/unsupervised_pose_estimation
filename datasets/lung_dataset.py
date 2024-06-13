@@ -43,6 +43,17 @@ class LungDataset(MonoDataset):
 
         return color
     
+    def get_folder_path_pose_prior(self, filename):
+        line = filename.split()
+        folder = line[0]
+
+        # implement a function to get data specific folder and frame_id     
+        frame_index = int(line[1])
+        side = line[2]
+       
+        return frame_index, folder, side
+    
+    
     def get_folder_path(self, filename):
         line = filename.split()
         folder = line[0]

@@ -6,7 +6,7 @@ import networks
 import numpy as np
 import math
 from torch.utils.data import DataLoader
-from layers import transformation_from_parameters_euler # transformation_from_parameters
+from layers import transformation_from_parameters_euler, transformation_from_parameters # transformation_from_parameters, 
 from utils import readlines
 from options_eval import MonodepthEvalOptions
 from datasets import LungRAWDataset
@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 # matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
+matplotlib.use('TkAgg',force=True)
 
 def sample_filenames_frequency(filenames, sampling_frequency):
     outputfilenames = []
@@ -346,10 +347,10 @@ def evaluate(opt):
                     
                 if opt.gaussian_correction:
                     # first pass the inputs through the decompose neteowk
-                    features  = models["decompose"](inputs[("color", 1, 0)]) # no augmentation for validation 
+                    features  = models["decompose"](inputs[("color", 0, 0)]) # no augmentation for validation 
                     frame1    = features[1]
                     
-                    features      = models["decompose"](inputs[("color", 0, 0)]) # no augmentation for validation 
+                    features      = models["decompose"](inputs[("color", 1, 0)]) # no augmentation for validation 
                     frame2    = features[1]
                 
                 # save_image(frame1, 'gauss_corrected_1.png')
@@ -361,13 +362,15 @@ def evaluate(opt):
                 # axisangle_.append(axisangle[:, 0].cpu().numpy())
                 # translation_.append(translation[:, 0].cpu().numpy())
 
+                # pred_poses.append(
+                #     transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0]).cpu().numpy())
                 pred_poses.append(
-                    transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0]).cpu().numpy())
+                    transformation_from_parameters(axisangle[:, 0], translation[:, 0], invert = True).cpu().numpy())
                 
         # if want to save
-        # np.savez('pose_prediction_{}.npz'.format(num), pred_poses)
-        # np.savez('axisangle_{}.npz'.format(num), axisangle_)
-        # np.savez('translation_{}.npz'.format(num), translation_)
+        np.savez('pose_prediction_{}.npz'.format(num), pred_poses)
+        np.savez('axisangle_{}.npz'.format(num), axisangle_)
+        np.savez('translation_{}.npz'.format(num), translation_)
         
         pred_poses = np.concatenate(pred_poses)
 

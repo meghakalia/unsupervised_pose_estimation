@@ -33,11 +33,12 @@ def parse_args():
     
     parser.add_argument('--output_folderName', type=str,
                         help='path to a test image or folder of images',
-                        default = 'correct_zero_padding_with_euler_gaussian_mask_uncertainty_0.0001')
+                        # default = 'correct_zero_padding_with_euler_gaussian_mask_uncertainty_0.0001')
+                        default = 'correctedgauss_correction_4gauss_mask_0.0001')
     
     parser.add_argument('--model_path', type=str,
                         # help='path to the test model', default ='/code/data/models_depth_scaled/mdp/models/weights_9') #models_pretrained/Model_MIA")
-                        help='path to the test model', default ='/code/data/models_disc_prior_logging/correct_zero_padding_with_euler_gaussian_mask_uncertainty_0.0001/models/weights_19') #models_pretrained/Model_MIA")
+                        help='path to the test model', default ='/code/data/models_disc_prior_logging/correctedgauss_correction_4gauss_mask_0.0001/models/weights_19') #models_pretrained/Model_MIA")
 
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="png")
@@ -232,7 +233,13 @@ def test_simple(args):
                 mask_t[mask == 0] = 0
                 input_image=input_image*mask_t
                 
-                
+            # save mask too
+            im = mask_t.squeeze().permute(1, 2, 0).cpu().numpy()
+            im = pil.fromarray(np.uint8(im*255))
+            output_name = os.path.splitext(os.path.basename(image_path))[0]
+            name_dest_im = os.path.join(output_directory, "mask_{}.jpeg".format(output_name))
+            im.save(name_dest_im, quality=95)
+            
             # PREDICTION
             # input_image = input_image.to(device)
             features = encoder(input_image)
@@ -243,7 +250,7 @@ def test_simple(args):
                 depth_decoder.train()
                 
                 outputs_combine = []
-                for run_count in range(5):
+                for run_count in range(10):
                     features = encoder(input_image)
                     outputs = depth_decoder(features)
                     
@@ -251,7 +258,8 @@ def test_simple(args):
                     disp = outputs[("disp", 0)]
                     # outputs_combine.append(disp_to_depth_no_scaling(disp))
                     outputs_combine.append(disp)
-                    
+                encoder.eval()
+                depth_decoder.eval()
                 # std 
                 c = torch.concat(outputs_combine, 0)
                 std_img = torch.std(c, dim=0, keepdim=True)

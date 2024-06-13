@@ -48,7 +48,8 @@ class MonoDataset(data.Dataset):
                  img_ext='.png', 
                  sampling_frequency = 2, 
                  adversarial_prior = False, 
-                 data_augment = True
+                 data_augment = True, 
+                 pose_prior = False
                  ):
         super(MonoDataset, self).__init__()
 
@@ -74,7 +75,8 @@ class MonoDataset(data.Dataset):
         self.to_PIL = transforms.ToPILImage()
         
         self.sampling_frequency = sampling_frequency
-
+        self.pose_prior = pose_prior
+        
         # We need to specify augmentations differently in newer versions of torchvision.
         # We first try the newer tuple version; if this fails we fall back to scalars
         try:
@@ -175,6 +177,8 @@ class MonoDataset(data.Dataset):
         
         inputs = {}
 
+        
+            
         if self.adversarial_prior:
             # generate a random index. 
             image_idx = torch.randint(self.len_ct_depth_data, (1,))
@@ -195,7 +199,17 @@ class MonoDataset(data.Dataset):
         
         do_flip = self.is_train and random.random() > 0.5
 
-        frame_index, folder, side = self.get_folder_path(self.filenames[index])
+        if self.pose_prior: 
+            frame_index, folder, side = self.get_folder_path_pose_prior(self.filenames[index])
+        else:          
+            frame_index, folder, side = self.get_folder_path(self.filenames[index]) # incorrect
+        
+        if self.pose_prior:
+            strings = self.filenames[index].split()
+            # inputs[('pose_prior', 1)] = torch.cat([(float(strings[4])), (float(strings[5])), (float(strings[6])), (float(strings[7])), (float(strings[8])), (float(strings[9]))])# check this # incorrect
+            inputs[('pose_prior', 1)] = torch.tensor([(float(strings[4])), (float(strings[5])), (float(strings[6])), (float(strings[7])), (float(strings[8])), (float(strings[9]))])# check this # incorrect
+            inputs[('pose_prior', -1)] = torch.tensor([float(strings[11]), float(strings[12]), float(strings[13]), float(strings[14]), float(strings[15]), float(strings[16])])
+            # inputs[('pose_prior', -1)] = torch.cat([float(strings[11]), float(strings[12]), float(strings[13]), float(strings[14]), float(strings[15]), float(strings[16])])
         
         for i in self.frame_idxs:
             if i == "s":
