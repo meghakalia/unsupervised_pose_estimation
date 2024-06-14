@@ -102,6 +102,9 @@ class Trainer:
 
         if self.opt.pose_prior: 
             self.pose_criterion = nn.MSELoss()
+        
+        if self.opt.pose_consistency_loss:
+            self.pose_consistency_criterion = nn.MSELoss()
             
         if self.opt.adversarial_prior: 
             
@@ -1053,6 +1056,12 @@ class Trainer:
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
 
+                    if self.opt.pose_consistency_loss:
+                        reverse_pose_inputs = [self.models["pose_encoder"](torch.cat(inputs_all_reverse, 1))]
+                        axisangle_reverse, translation_reverse = self.models["pose"](reverse_pose_inputs)
+                        outputs[("reverse_axisangle", 0, f_i)] = axisangle_reverse
+                        outputs[("reverse_translation", 0, f_i)] = translation_reverse
+                        
                     # Invert the matrix if the frame id is negative
                     if self.opt.use_euler:
                         outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters_euler(
@@ -1490,6 +1499,7 @@ class Trainer:
                 axisangle_trans_5 = torch.cat([outputs[("axisangle", 0, frame_id)][:, 0, :, :2], outputs[("translation", 0, frame_id)][:, 0, :, :]], 2)
                 prior_axisangle_trans_5 = inputs[('pose_prior', frame_id)][:,:5][:, None, :]
                 pose_loss+=self.pose_criterion(axisangle_trans_5, prior_axisangle_trans_5) # check this
+                
         if self.opt.adversarial_prior:
             # how far is the model from valid examples 
             self.Discriminator.eval()
@@ -1499,7 +1509,23 @@ class Trainer:
             
             # how far is it from CT
             
-            
+        # if self.opt.forward_backward_loss:
+        #     outputs[("axisangle", 0, frame_id)]
+        if self.opt.pose_consistency_loss:
+            pose_consistency_loss = 0 
+            for frame_id in [-1, 1]:
+                reverse_euler_ = matrix_to_euler_angles(euler_angles_to_matrix(outputs[("reverse_axisangle", 0, frame_id)][:,0], 'ZYX')[:,:3,:3], 'XYZ')
+                current_euler = outputs[("axisangle", 0, frame_id)][:,0]
+                reverse_euler = -torch.flip(reverse_euler_, dims=(1,))[:,None,:]
+                
+                reverse_translation = torch.matmul(euler_angles_to_matrix(outputs[("reverse_axisangle", 0, frame_id)][:,0], 'ZYX')[:,:3,:3], -outputs[("translation", 0, frame_id)][:,0].permute(0, 2, 1)) 
+                curr_translation = outputs[("reverse_translation", 0, frame_id)]
+                
+                curr_dof    = torch.cat([current_euler, curr_translation[:,0, :, :]], 2)
+                rev_dof     = torch.cat([reverse_euler, reverse_translation.permute(0, 2, 1)], 2)
+                loss_       = self.pose_consistency_criterion(curr_dof, rev_dof)
+
+                pose_consistency_loss+=(loss_)
                 
         if self.opt.pre_trained_generator:
             
@@ -1558,7 +1584,6 @@ class Trainer:
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
 
-                
             if not self.opt.disable_automasking:
                 identity_reprojection_losses = []
                 for frame_id in self.opt.frame_ids[1:]:
@@ -1639,7 +1664,7 @@ class Trainer:
         if self.opt.pose_prior:
             losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss + pose_loss
         else:
-            losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss
+            losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss + pose_consistency_loss
         return losses
 
     def compute_depth_losses(self, inputs, outputs, losses):

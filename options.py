@@ -65,12 +65,12 @@ class MonodepthOptions:
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="test")
+                                 default="pose_consistency")
         
         self.parser.add_argument("--split",
                                  type=str,
@@ -223,8 +223,12 @@ class MonodepthOptions:
                                  default=12)
 
         # LOADING options
-        self.parser.add_argument("--pose_prior",
+        self.parser.add_argument("--pose_consistency_loss",
                                  action="store_false",
+                                 help="true or false")
+        
+        self.parser.add_argument("--pose_prior",
+                                 action="store_true",
                                  help="true or false")
         
         self.parser.add_argument("--load_discriminator",

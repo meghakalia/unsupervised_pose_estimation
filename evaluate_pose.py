@@ -14,8 +14,8 @@ from torchvision.utils import save_image
 import matplotlib.pyplot as plt
 import matplotlib
 
-# matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
-matplotlib.use('TkAgg',force=True)
+matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
+# matplotlib.use('TkAgg',force=True)
 
 def sample_filenames_frequency(filenames, sampling_frequency):
     outputfilenames = []
@@ -151,30 +151,30 @@ def plotTrajectory(pred_poses, gt_local_poses, save_fig = False, name = 0):
     figure2, = ax.plot(points_our[:, 0, 0], points_our[:, 1, 0], points_our[:, 2, 0], c='g', linewidth=1.6)
 
     if save_fig:
-        plt.savefig('weights_forfrankie12_{}.png'.format(name),dpi=600)
+        plt.savefig('pose_prior_{}.png'.format(name),dpi=600)
     
-    plt.show()
+    # plt.show()
     
-    plt.clf()
-     # distance plot 
-    dist_pred  = np.array(dist_pred)
-    dist_gt   = np.array(dist_gt)
+    # plt.clf()
+    #  # distance plot 
+    # dist_pred  = np.array(dist_pred)
+    # dist_gt   = np.array(dist_gt)
     
-    fig = plt.figure()
-    ax = fig.add_subplot()
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
 
-    # set figure information
-    # ax.set_title("3D_Curve")
-    ax.set_xlabel("number of points")
-    ax.set_ylabel("distance (mm)")
+    # # set figure information
+    # # ax.set_title("3D_Curve")
+    # ax.set_xlabel("number of points")
+    # ax.set_ylabel("distance (mm)")
     
-    # draw the figure, the color is r = read
-    figure1, = ax.plot(dist_gt, c='b', linewidth=1.6)
-    figure2, = ax.plot(dist_pred, c='g', linewidth=1.6)
+    # # draw the figure, the color is r = read
+    # figure1, = ax.plot(dist_gt, c='b', linewidth=1.6)
+    # figure2, = ax.plot(dist_pred, c='g', linewidth=1.6)
 
-    plt.ylim(0,60)
-    if save_fig:
-        plt.savefig('weights_12_distforFrankie{}.png'.format(name),dpi=600)
+    # plt.ylim(0,60)
+    # if save_fig:
+    #     plt.savefig('weights_12_distforFrankie{}.png'.format(name),dpi=600)
     
     return plt
     # plt.show()
