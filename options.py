@@ -58,6 +58,7 @@ class MonodepthOptions:
         self.parser.add_argument("--use_euler",
                                  help="whether euler or axis angle",
                                  action="store_false")
+   
         
         self.parser.add_argument("--pre_trained_generator",
                                  help="whether pretrained gan is on or off ",
@@ -70,7 +71,7 @@ class MonodepthOptions:
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="pose_consistency")
+                                 default="long_term_consistency_gauss_mask_pose_consistency_separate_rot_trans")
         
         self.parser.add_argument("--split",
                                  type=str,
@@ -111,6 +112,9 @@ class MonodepthOptions:
                                  type=float,
                                  help="consistency constraint weight",
                                  default=0.01)
+        
+        
+        
         self.parser.add_argument("--epipolar_constraint",
                                  type=float,
                                  help="epipolar constraint weight",
@@ -227,6 +231,10 @@ class MonodepthOptions:
                                  action="store_false",
                                  help="true or false")
         
+        self.parser.add_argument("--longterm_consistency_loss",
+                                 action="store_false",
+                                 help="true or false")
+        
         self.parser.add_argument("--pose_prior",
                                  action="store_true",
                                  help="true or false")
@@ -237,17 +245,17 @@ class MonodepthOptions:
         
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
-                                 default = None, 
+                                 # default = None, 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
-                                 # default = '/code/code/4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_True_gauss_num_1_batchnorm_True_ssim_l1_0.65_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_23',
+                                 default = '/code/code/4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_True_gauss_num_1_batchnorm_True_ssim_l1_0.65_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_23',
                                  help="name of model to load")
         self.parser.add_argument("--models_to_load",
                                  nargs="+",
                                  type=str,
                                  help="models to load",
-                                 default = None)
-                                 # default = ["decompose", 'sigma_combined', 'gaussian1'] )
+                                 # default = None)
+                                 default = ["decompose", 'sigma_combined', 'gaussian1'] )
                               #    default=["pose_encoder", "pose", "depth", "encoder"])
                               #    default=["position_encoder", "position"])
 

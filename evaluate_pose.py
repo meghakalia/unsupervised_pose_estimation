@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function
-
+from scipy.spatial.transform import Rotation as R
 import os
 import torch
 import networks
@@ -105,10 +105,12 @@ def plotTrajectory(pred_poses, gt_local_poses, save_fig = False, name = 0):
     # gt_local_poses_absolute = loadGTposes(our_path_gt)
     gt_local_poses = gt_local_poses[:len(pred_poses), :, :]
     dump_our = np.array(dump(our_local_poses))
-    dump_gt = np.array(dump(gt_local_poses))
+    dump_gt = np.array(dump_gt_new(gt_local_poses))
 
     # scale_num = compute_scale(dump_gt, dump_our)
-    scale_our = dump_our * compute_scale(dump_gt, dump_our)
+    scale_our = dump_our * np.abs(compute_scale(dump_gt, dump_our))
+    
+    # scale_our = dump_our * 8.5
     # scale_our = dump_our
     
     num = len(gt_local_poses) # shoudl be array
@@ -149,6 +151,14 @@ def plotTrajectory(pred_poses, gt_local_poses, save_fig = False, name = 0):
     # draw the figure, the color is r = read
     figure1, = ax.plot(points_gt[:, 0, 0], points_gt[:, 1, 0], points_gt[:, 2, 0], c='b', linewidth=1.6)
     figure2, = ax.plot(points_our[:, 0, 0], points_our[:, 1, 0], points_our[:, 2, 0], c='g', linewidth=1.6)
+    
+    origin = [0, 0, 0]
+    
+    ax.quiver(*origin, 1, 0, 0, color='r', arrow_length_ratio=0.1)
+    # Y-axis (green)
+    ax.quiver(*origin, 0, 1, 0, color='g', arrow_length_ratio=0.1)
+    # Z-axis (blue)
+    ax.quiver(*origin, 0, 0, 1, color='b', arrow_length_ratio=0.1)
 
     if save_fig:
         plt.savefig('pose_prior_{}.png'.format(name),dpi=600)
@@ -179,13 +189,30 @@ def plotTrajectory(pred_poses, gt_local_poses, save_fig = False, name = 0):
     return plt
     # plt.show()
     
-    
+r = R.from_euler('z', 180, degrees=True).as_matrix()
+k = np.eye(4)
+k[:3,:3] = r
 def dump(source_to_target_transformations):
+    Ms = []
+    # cam_to_world = np.matmul(np.eye(4), k)
+    cam_to_world = np.eye(4)
+    Ms.append(cam_to_world)
+    for source_to_target_transformation in source_to_target_transformations:
+        cam_to_world = np.matmul(cam_to_world, source_to_target_transformation)
+        # cam_to_world = np.dot(cam_to_world, source_to_target_transformation)
+        Ms.append(cam_to_world)
+    return Ms
+
+def dump_gt_new(source_to_target_transformations):
     Ms = []
     cam_to_world = np.eye(4)
     Ms.append(cam_to_world)
     for source_to_target_transformation in source_to_target_transformations:
-        cam_to_world = np.dot(source_to_target_transformation, cam_to_world)
+        cam_to_world = np.matmul(cam_to_world, source_to_target_transformation) # consistent
+        # cam_to_world = np.dot(np.matmul(k, source_to_target_transformation), cam_to_world)
+        # cam_to_world = np.dot(cam_to_world, source_to_target_transformation)
+        # cam_to_world = np.dot(cam_to_world, source_to_target_transformation)
+        # cam_to_world = np.matmul(np.linalg.inv(source_to_target_transformation), cam_to_world)
         Ms.append(cam_to_world)
     return Ms
 
@@ -222,7 +249,8 @@ def evaluate(opt):
         
         # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,pin_memory=False, drop_last=False)
         # model_path = opt.load_weights_folder[:-2] + str(traj)
-        model_path        = opt.load_weights_folder[:-2] + str(traj)
+        # model_path        = opt.load_weights_folder[:-2] + str(traj)
+        model_path = opt.load_weights_folder
         pose_encoder_path = os.path.join(model_path, "pose_encoder.pth")
         pose_decoder_path = os.path.join(model_path, "pose.pth")
 
@@ -350,7 +378,7 @@ def evaluate(opt):
                     features  = models["decompose"](inputs[("color", 0, 0)]) # no augmentation for validation 
                     frame1    = features[1]
                     
-                    features      = models["decompose"](inputs[("color", 1, 0)]) # no augmentation for validation 
+                    features  = models["decompose"](inputs[("color", 1, 0)]) # no augmentation for validation 
                     frame2    = features[1]
                 
                 # save_image(frame1, 'gauss_corrected_1.png')
@@ -365,12 +393,12 @@ def evaluate(opt):
                 # pred_poses.append(
                 #     transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0]).cpu().numpy())
                 pred_poses.append(
-                    transformation_from_parameters(axisangle[:, 0], translation[:, 0], invert = True).cpu().numpy())
+                    transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0], invert = False).cpu().numpy())
                 
         # if want to save
-        np.savez('pose_prediction_{}.npz'.format(num), pred_poses)
-        np.savez('axisangle_{}.npz'.format(num), axisangle_)
-        np.savez('translation_{}.npz'.format(num), translation_)
+        # np.savez('pose_prediction_{}.npz'.format(num), pred_poses)
+        # np.savez('axisangle_{}.npz'.format(num), axisangle_)
+        # np.savez('translation_{}.npz'.format(num), translation_)
         
         pred_poses = np.concatenate(pred_poses)
 
