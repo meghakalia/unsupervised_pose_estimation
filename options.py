@@ -48,7 +48,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--write_split_file",
                                  help="if set, will do the train-val split and write in a file",
-                                 action="store_false")# false
+                                 action="store_true")# false
         
         self.parser.add_argument("--gaussian_correction",
                                  help="if set, will do enable gaussian correction",
@@ -66,18 +66,18 @@ class MonodepthOptions:
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="long_term_consistency_gauss_mask_pose_consistency_separate_rot_trans")
+                                 default="stomach_data")
         
         self.parser.add_argument("--split",
                                  type=str,
                                  help="which training split to use",
-                                 choices=["endovis", "eigen_zhou", "eigen_full", "odom", "benchmark"],
-                                 default="endovis")
+                                 choices=["endovis", "eigen_zhou", "eigen_full", "odom", "benchmark", "endoSLAM"],
+                                 default="endoSLAM")
         
         self.parser.add_argument("--num_layers",
                                  type=int,
@@ -87,23 +87,23 @@ class MonodepthOptions:
         self.parser.add_argument("--dataset",
                                  type=str,
                                  help="dataset to train on",
-                                 default="endovis",
-                                 choices=["endovis", "kitti", "kitti_odom", "kitti_depth", "kitti_test", "vnb", "porcine"])
+                                 default="endoSLAM",
+                                 choices=["endovis", "kitti", "kitti_odom", "kitti_depth", "kitti_test", "vnb", "porcine", "endoSLAM"])
         self.parser.add_argument("--png",
                                  help="if set, trains from raw KITTI png files (instead of jpgs)",
                                  action="store_true")
         self.parser.add_argument("--height",
                                  type=int,
                                  help="input image height",
-                                 default=192) # for scared data 960//5, default=192, for scared : 256x320
+                                 default=320) # for scared data 960//5, default=192, for scared : 256x320
         self.parser.add_argument("--width",
                                  type=int,
                                  help="input image width",
-                                 default=192) # for scared data 1280//5, default=192
+                                 default=320) # for scared data 1280//5, default=192
         self.parser.add_argument("--disparity_smoothness",
                                  type=float,
                                  help="disparity smoothness weight",
-                                 default=1e-4)
+                                 default=0)#1e-4
         self.parser.add_argument("--position_smoothness",
                                  type=float,
                                  help="registration smoothness weight",
@@ -155,7 +155,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--eval_pose_trajectory",
                                  help="this will evaluate the model performance on trajectory",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--tra_path",
                                  type=str,
@@ -194,7 +194,11 @@ class MonodepthOptions:
                                  action="store_true")
         self.parser.add_argument("--disable_automasking",
                                  help="if set, doesn't do auto-masking",
-                                 action="store_true")
+                                 action="store_false")
+        self.parser.add_argument("--enable_endoMasking",
+                        help="if set, doesn't do auto-masking",
+                        action="store_true")
+         
         self.parser.add_argument("--predictive_mask",
                                  help="if set, uses a predictive masking scheme as in Zhou et al",
                                  action="store_true")
@@ -228,12 +232,22 @@ class MonodepthOptions:
 
         # LOADING options
         self.parser.add_argument("--pose_consistency_loss",
-                                 action="store_false",
+                                 action="store_true",
                                  help="true or false")
         
+        self.parser.add_argument("--pose_consistency_weight",
+                                 type=float,
+                                 help="loss weight",
+                                 default=0.001)
+        
         self.parser.add_argument("--longterm_consistency_loss",
-                                 action="store_false",
+                                 action="store_true",
                                  help="true or false")
+        
+        self.parser.add_argument("--longterm_consistency_weight",
+                                 type=float,
+                                 help="loss weight",
+                                 default=0.001)
         
         self.parser.add_argument("--pose_prior",
                                  action="store_true",
@@ -245,10 +259,10 @@ class MonodepthOptions:
         
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
-                                 # default = None, 
+                                 default = None, 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
-                                 default = '/code/code/4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_True_gauss_num_1_batchnorm_True_ssim_l1_0.65_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_23',
+                                 # default = '/code/code/4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_True_gauss_num_1_batchnorm_True_ssim_l1_0.65_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_23',
                                  help="name of model to load")
         self.parser.add_argument("--models_to_load",
                                  nargs="+",

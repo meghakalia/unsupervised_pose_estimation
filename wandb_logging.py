@@ -46,9 +46,9 @@ class wandb_logging:
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
         if experiment_name:
-            wandb.init(project="Pose_prior_eulerAngle", config=self.config, dir = 'data/logs')
+            wandb.init(project="endoslam", config=self.config, dir = 'data/logs')
         else:
-            wandb.init(project="Pose_prior_eulerAngle", config=self.config, dir = 'data/logs', name = experiment_name)
+            wandb.init(project="endoslam", config=self.config, dir = 'data/logs', name = experiment_name)
         
         self.save_colored_depth = False
         
@@ -197,10 +197,10 @@ class wandb_logging:
                     self.log_single_image(''.join((mode,str(s),'depth_')), image = npimg, caption = "{}_{}_{}_{}".format(character, mode, s, ''.join('depth_')), step=step)
                     
                     # self.log_image_grid(mode = mode, image_list = c_depth, scale = s, caption = 'depth_', character = ''.join((character,"{}".format(s))), step = step)
-                    
-                    c_automask = torch.concat(image_list_automask, 0)
-                    c_automask = c_automask[:, None, :, :]
-                    self.log_image_grid(mode = mode, image_list = c_automask, scale = s, caption = 'automask_ ', character = ''.join((character,"{}".format(s))), step = step)
+                    if image_list_automask:
+                        c_automask = torch.concat(image_list_automask, 0)
+                        c_automask = c_automask[:, None, :, :]
+                        self.log_image_grid(mode = mode, image_list = c_automask, scale = s, caption = 'automask_ ', character = ''.join((character,"{}".format(s))), step = step)
                     
                     if len(image_list_pred_color) > 0:
                         c_pred_color = torch.concat(image_list_pred_color, 0)

@@ -322,7 +322,18 @@ def _angle_from_tan(
         return torch.atan2(-data[..., i2], data[..., i1])
     return torch.atan2(data[..., i2], -data[..., i1])
 
+def matrix_2_euler_vector(matrix, convention = 'ZYX', roll = True):
+    # matrix = matrix_in.copy()
+    euler = (matrix_to_euler_angles(matrix[:, :3,:3], convention)) # to match with scipy euler = -euler and transpose of this 
+    
+    if roll:
+        euler[0] = 0.0
+    t = matrix[:, :3,3]
 
+    out = torch.cat([euler, t], dim = 0)
+
+    return out
+    
 def _index_from_letter(letter: str) -> int:
     if letter == "X":
         return 0

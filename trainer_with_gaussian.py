@@ -29,7 +29,9 @@ from IPython import embed
 
 # from datasets import SCAREDRAWDataset
 
-from datasets import LungRAWDataset
+# from datasets import LungRAWDataset
+
+from datasets import endoSLAMRAWDataset
 
 from torchvision.utils import save_image
 
@@ -306,31 +308,35 @@ class Trainer:
         # datasets_dict = {"kitti": datasets.KITTIRAWDataset,
         #                  "kitti_odom": datasets.KITTIOdomDataset}
 
-        datasets_dict = {"endovis": datasets.LungRAWDataset}
+        # datasets_dict = {"endovis": datasets.LungRAWDataset}
+        
+        datasets_dict = {"endoSLAM": datasets.endoSLAMRAWDataset}
+    
 
         self.dataset = datasets_dict[self.opt.dataset]
 
         if self.opt.pose_prior:
             fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5_pose_explicit.txt")
         else:
-            fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
+            if self.opt.split == "endoSLAM":
+                fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_endoSLAMUnity.txt")
+            else:
+                fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
         
-        train_filenames = readlines(fpath.format("train")) # exclude frame accordingly
-        val_filenames = readlines(fpath.format("val"))
+        train_filenames = readlines(fpath.format("train"))[5:-5] # exclude frame accordingly
+        val_filenames = readlines(fpath.format("val"))[5:-5]
 
         # train_filenames = readlines(fpath.format("train"))[self.sampling_frequency+2:-self.sampling_frequency-6] # exclude frame accordingly
         # val_filenames = readlines(fpath.format("val"))[self.sampling_frequency+2:-self.sampling_frequency-6]
-        
-        
+              
         img_ext = '.png'
 
-        
         num_train_samples = len(train_filenames)
         self.num_total_steps = num_train_samples // self.opt.batch_size * self.opt.num_epochs
 
         train_dataset = self.dataset(
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2271, sampling_frequency = self.sampling_frequency, pose_prior = self.opt.pose_prior )
+            self.opt.frame_ids, 4, data_augment = False, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2271, sampling_frequency = self.sampling_frequency, pose_prior = self.opt.pose_prior )
         
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
@@ -342,7 +348,7 @@ class Trainer:
         
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0, sampling_frequency = 2, pose_prior = self.opt.pose_prior)
+            self.opt.frame_ids, 4, is_train=False, data_augment = False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0, sampling_frequency = 2, pose_prior = self.opt.pose_prior)
         
         # self.val_loader = DataLoader(
         #     val_dataset, self.opt.batch_size, True,
@@ -476,7 +482,7 @@ class Trainer:
                     
                 self.log_wand("val2", traj_outputs, traj_losses, self.wanb_obj, step = self.epoch, character="trajectory")
             
-            if (self.epoch + 1) % self.opt.save_frequency == 0:
+            if self.epoch > 5 and (self.epoch + 1) % self.opt.save_frequency == 0:
                 self.save_model()
         self.wanb_obj.finishWandb()
 
@@ -522,18 +528,18 @@ class Trainer:
                     
                     gauss_mask_combined.append(gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
                 
-                mask = torch.cat(gauss_mask_combined, 1).sum(1)/9
+                mask, idx = torch.min(torch.cat(gauss_mask_combined, 1), 1, keepdim = True) 
+                # mask = torch.cat(gauss_mask_combined, 1).sum(1)/9
                 
                 mask[mask < 0.6] = 0
                 
-           
                 gaussian_reponse['gaussian_mask1'].append(mask[:,None, :, :][:4]) 
                 # gaussian_reponse['decomposed'].append(inputs["color_aug", frame_id, 0])
                 gaussian_reponse['original'].append(inputs["color_aug", frame_id, 0])
                     
                 for s in self.opt.scales:
                     # inputs["color_aug", frame_id, s] = self.resize_transform[s](decomposed)
-                    inputs.update({("gauss_mask", s):self.resize_transform[s](mask[:,None, :, :])})
+                    inputs.update({("gauss_mask", s):self.resize_transform[s](mask)})
                     mask_t = torch.ones(inputs[("gauss_mask", s)].shape).cuda()
                     new_mask = inputs[("gauss_mask", s)]
                     mask_t[new_mask == 0] = 0
@@ -543,8 +549,13 @@ class Trainer:
                     for frame_id in self.opt.frame_ids:
                         inputs["color_aug", frame_id, s]=inputs["color_aug", frame_id, s]*mask_t # wrong there shouudl be no gradation
                         # save_image(inputs["color_aug", frame_id, s], f'image_{s}_fid_{frame_id}.png')
-                        
                     
+                    # mask_original = torch.cat(gauss_mask_combined, 1)
+                    # test_mask = torch.zeros(mask_original.shape).cuda()
+                    # test_mask[mask_original<0.6] = 1
+                    # new_test_mask = test_mask.sum(1)/9
+                    # new_test_mask2 = torch.ones(new_test_mask.shape).cuda()
+                    # new_test_mask2[new_test_mask==1] = 0
             # add in the same optimizer 
             # update the inputs after decompose
             # process and update inputs here 
@@ -609,6 +620,17 @@ class Trainer:
             if self.opt.gaussian_correction:
                 outputs, losses = self.process_batch_gauss(inputs)
             else:
+                if self.opt.enable_endoMasking:
+                    for s in self.opt.scales:
+
+                    # multiply inputs with it: 
+                        for frame_id in self.opt.frame_ids:
+                            mask_endo = torch.ones(inputs["color", frame_id, s].shape)
+                            mask_endo[inputs["color", frame_id, s]==0] = 0 
+                            inputs["color_aug", frame_id, s] = inputs["color_aug", frame_id, s]*mask_endo
+                            
+                            inputs.update({("endoslam_mask", s):mask_endo})
+                              
                 outputs, losses = self.process_batch(inputs)
 
             self.model_optimizer.zero_grad()
@@ -1072,9 +1094,12 @@ class Trainer:
                 # outputs[("eulerTanslation_serial")] = matrix_to_euler_angles(outputs[("cam_T_cam_serial")], 'ZYX')
                 
                 # check to convert to rotation and translation 
-                outputs[("eulerTanslation_lonterm")] = torch.flatten(outputs[("cam_T_cam_longterm")], 1)
-                outputs[("eulerTanslation_serial")]  = torch.flatten(outputs[("cam_T_cam_serial")], 1)
-
+                # outputs[("eulerTanslation_lonterm")] = torch.flatten(outputs[("cam_T_cam_longterm")], 1)
+                # outputs[("eulerTanslation_serial")]  = torch.flatten(outputs[("cam_T_cam_serial")], 1)
+                
+                outputs[("eulerTanslation_lonterm")] = matrix_2_euler_vector(outputs[("cam_T_cam_longterm")], 'ZYX')
+                outputs[("eulerTanslation_serial")]  = matrix_2_euler_vector(outputs[("cam_T_cam_serial")], 'ZYX')
+                                       
         else:
             # Here we input all frames to the pose net (and predict all poses) together
             if self.opt.pose_model_type in ["separate_resnet", "posecnn"]:
@@ -1149,6 +1174,17 @@ class Trainer:
                     mask_t[new_mask == 0] = 0
                     for frame_id in self.opt.frame_ids:
                         inputs["color_aug", frame_id, s]=inputs["color_aug", frame_id, s]*mask_t
+                        
+            if self.opt.enable_endoMasking:
+                for s in self.opt.scales:
+
+                # multiply inputs with it: 
+                    for frame_id in self.opt.frame_ids:
+                        mask_endo = torch.ones(inputs["color", frame_id, s].shape)
+                        mask_endo[inputs["color", frame_id, s]==0] = 0 
+                        inputs["color_aug", frame_id, s] = inputs["color_aug", frame_id, s]*mask_endo
+                        
+                        inputs.update({("endoslam_mask", s):mask_endo})
             outputs, losses = self.process_batch(inputs) # process batch eval 
             
             # run on trajectory for pose
@@ -1456,7 +1492,7 @@ class Trainer:
             if not self.opt.disable_automasking:
                 # add random numbers to break ties, why because this can be zero ?
                 # identity_reprojection_loss += torch.randn(
-                #     identity_reprojection_loss.shape, device=self.device) * 0.00001
+                #     identity_reprojection_loss.shape, device=self.device) * 0.000000001
 
                 combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
             else:
@@ -1639,7 +1675,7 @@ class Trainer:
             if not self.opt.disable_automasking:
                 # add random numbers to break ties
                 # identity_reprojection_loss += torch.randn(
-                #     identity_reprojection_loss.shape, device=self.device) * 0.00001
+                #     identity_reprojection_loss.shape, device=self.device) * 0.00000001
 
                 combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
             else:
@@ -1654,9 +1690,15 @@ class Trainer:
                 outputs["identity_selection/{}".format(scale)] = (
                     idxs > identity_reprojection_loss.shape[1] - 1).float() # wheres is it used ?
 
+                if self.opt.enable_endoMasking:
+                    outputs["identity_selection/{}".format(scale)] = outputs["identity_selection/{}".format(scale)]*inputs[("endoslam_mask", 0)][:, 0, :, :]
+                    
             # here add the mask weighted mean 
             if self.opt.enable_gauss_mask:
                 to_optimise_masked = to_optimise*inputs[("gauss_mask", 0)].squeeze()
+                loss += to_optimise_masked.mean()
+            elif self.opt.enable_endoMasking:
+                to_optimise_masked = to_optimise*inputs[("endoslam_mask", 0)][:, 0, :, :]
                 loss += to_optimise_masked.mean()
             else:  
                 loss += to_optimise.mean()
@@ -1684,10 +1726,10 @@ class Trainer:
             losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss 
             
         if self.opt.pose_consistency_loss:
-            losses["loss"]+=pose_consistency_loss
+            losses["loss"]+=(pose_consistency_loss*self.opt.pose_consistency_weight)
         
         if self.opt.longterm_consistency_loss:
-            losses["loss"]+=losses["long_term_consistency_loss"]    
+            losses["loss"]+=(losses["long_term_consistency_loss"]*self.opt.longterm_consistency_weight)
             
             
         return losses
