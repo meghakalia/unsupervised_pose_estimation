@@ -308,9 +308,14 @@ class Trainer:
         # datasets_dict = {"kitti": datasets.KITTIRAWDataset,
         #                  "kitti_odom": datasets.KITTIOdomDataset}
 
-        # datasets_dict = {"endovis": datasets.LungRAWDataset}
+        if self.opt.split == "endoSLAM":  
+            datasets_dict = {"endovis": datasets.endoSLAMRAWDataset}
+        else:
+            datasets_dict = {"endovis": datasets.LungRAWDataset}
+            
+        # 
         
-        datasets_dict = {"endoSLAM": datasets.endoSLAMRAWDataset}
+        # 
     
 
         self.dataset = datasets_dict[self.opt.dataset]
@@ -626,10 +631,16 @@ class Trainer:
                     # multiply inputs with it: 
                         for frame_id in self.opt.frame_ids:
                             mask_endo = torch.ones(inputs["color", frame_id, s].shape)
-                            mask_endo[inputs["color", frame_id, s]==0] = 0 
+                            idx, mask_ = inputs["color", frame_id, s].min(1)
+                            mask_ = mask_[:, None, :, :]
+                            mask_new = torch.cat([mask_, mask_, mask_], 1)
+                            mask_endo[mask_new==0] = 0 
                             inputs["color_aug", frame_id, s] = inputs["color_aug", frame_id, s]*mask_endo
                             
+                            # save_image(inputs["color_aug", frame_id, s], "inputs[color_aug, {}, {}].png".format(frame_id, s))
+
                             inputs.update({("endoslam_mask", s):mask_endo})
+                            # save_image(inputs["endoslam_mask", s], "inputs[endoslam_mask, {}].png".format(s), normalize = True)
                               
                 outputs, losses = self.process_batch(inputs)
 
@@ -1180,8 +1191,12 @@ class Trainer:
 
                 # multiply inputs with it: 
                     for frame_id in self.opt.frame_ids:
+          
                         mask_endo = torch.ones(inputs["color", frame_id, s].shape)
-                        mask_endo[inputs["color", frame_id, s]==0] = 0 
+                        idx, mask_ = inputs["color", frame_id, s].min(1)
+                        mask_ = mask_[:, None, :, :]
+                        mask_new = torch.cat([mask_, mask_, mask_], 1)
+                        mask_endo[mask_new==0] = 0 
                         inputs["color_aug", frame_id, s] = inputs["color_aug", frame_id, s]*mask_endo
                         
                         inputs.update({("endoslam_mask", s):mask_endo})

@@ -25,7 +25,7 @@ if opts.wandb_sweep:
     
 def main():
     
-    learning_rate_opt = [6, 4, 5, 7]
+    learning_rate_opt = [2, 3, 4, 5]
     # learning_rate_opt   = np.random.permutation(4) + 3
     # fraction_opt        =  np.random.permutation(4)
     # learning_rate_opt = 5

@@ -87,7 +87,7 @@ class MonodepthOptions:
         self.parser.add_argument("--dataset",
                                  type=str,
                                  help="dataset to train on",
-                                 default="endoSLAM",
+                                 default="endovis",
                                  choices=["endovis", "kitti", "kitti_odom", "kitti_depth", "kitti_test", "vnb", "porcine", "endoSLAM"])
         self.parser.add_argument("--png",
                                  help="if set, trains from raw KITTI png files (instead of jpgs)",
@@ -103,7 +103,7 @@ class MonodepthOptions:
         self.parser.add_argument("--disparity_smoothness",
                                  type=float,
                                  help="disparity smoothness weight",
-                                 default=0)#1e-4
+                                 default=1e-4)#1e-4
         self.parser.add_argument("--position_smoothness",
                                  type=float,
                                  help="registration smoothness weight",
@@ -192,12 +192,14 @@ class MonodepthOptions:
         self.parser.add_argument("--avg_reprojection",
                                  help="if set, uses average reprojection loss",
                                  action="store_true")
+        
         self.parser.add_argument("--disable_automasking",
                                  help="if set, doesn't do auto-masking",
-                                 action="store_false")
+                                 action="store_true")
+        
         self.parser.add_argument("--enable_endoMasking",
                         help="if set, doesn't do auto-masking",
-                        action="store_true")
+                        action="store_false")
          
         self.parser.add_argument("--predictive_mask",
                                  help="if set, uses a predictive masking scheme as in Zhou et al",
@@ -264,6 +266,7 @@ class MonodepthOptions:
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
                                  # default = '/code/code/4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_True_gauss_num_1_batchnorm_True_ssim_l1_0.65_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_23',
                                  help="name of model to load")
+        
         self.parser.add_argument("--models_to_load",
                                  nargs="+",
                                  type=str,
