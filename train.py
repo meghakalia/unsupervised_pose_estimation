@@ -25,17 +25,20 @@ if opts.wandb_sweep:
     
 def main():
     
-    learning_rate_opt = [2, 3, 4, 5]
-    # learning_rate_opt   = np.random.permutation(4) + 3
+    # learning_rate_opt = [5]
+    # learning_rate_opt   = np.random.permutation(4) + 4
+    
+    learning_rate_opt = [5]
     # fraction_opt        =  np.random.permutation(4)
     # learning_rate_opt = 5
-    for i in range(4):
+    # for i in range(3, 0, -1):
     #    idx = np.random.randint(0,6)
-       frac = 0.65
-       learn_rate = 10**(-float(learning_rate_opt[i]))
-       frequency = 4
-       trainer = Trainer(opts, lr = learn_rate, sampling=frequency, frac = frac)
-       trainer.train()
+    for j in range(len(learning_rate_opt)):
+        frac = 0.65
+        learn_rate = 10**(-float(learning_rate_opt[j]))
+        frequency = 2
+        trainer = Trainer(opts, lr = learn_rate, sampling=frequency, frac = frac)
+        trainer.train()
     # 
         # frac = 0.55 + float(fraction_opt[i])*0.10
         

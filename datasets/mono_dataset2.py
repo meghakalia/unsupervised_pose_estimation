@@ -49,7 +49,8 @@ class MonoDataset(data.Dataset):
                  sampling_frequency = 2, 
                  adversarial_prior = False, 
                  data_augment = True, 
-                 pose_prior = False
+                 pose_prior = False, 
+                 depth_prior = True
                  ):
         super(MonoDataset, self).__init__()
 
@@ -69,7 +70,7 @@ class MonoDataset(data.Dataset):
 
         self.is_train = is_train
         self.img_ext = img_ext
-
+        self.depth_prior_endoslam = depth_prior
         self.loader = pil_loader
         self.to_tensor = transforms.ToTensor()
         self.to_PIL = transforms.ToPILImage()
@@ -173,8 +174,8 @@ class MonoDataset(data.Dataset):
         """
         
         # sample random number between 1 to the sampling frequency inclusive. 
-        curr_sampling_rate = np.random.randint(1, self.sampling_frequency, size=1)[0]
-        
+        # curr_sampling_rate = np.random.randint(1, self.sampling_frequency, size=1)[0]
+        curr_sampling_rate = self.sampling_frequency # for colonoscopy 
         inputs = {}
 
         
@@ -218,6 +219,9 @@ class MonoDataset(data.Dataset):
             else:
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip)
 
+        if self.depth_prior_endoslam:
+            inputs[("color_depth", 0, 0)] = self.to_tensor(self.get_depth_endoslam(folder, frame_index))
+        
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):
             K = self.K.copy()
@@ -270,6 +274,12 @@ class MonoDataset(data.Dataset):
         raise NotImplementedError
     
     def get_color(self, folder, frame_index, side, do_flip):
+        raise NotImplementedError
+    
+    def get_depth_endoslam(self, folder, frame_index):
+        raise NotImplementedError
+    
+    def get_depth_image_path(self, folder, frame_index):
         raise NotImplementedError
 
     def check_depth(self):

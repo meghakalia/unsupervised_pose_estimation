@@ -71,7 +71,7 @@ class MonodepthOptions:
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="stomach_data")
+                                 default="log_loss_colon_data")
         
         self.parser.add_argument("--split",
                                  type=str,
@@ -95,15 +95,15 @@ class MonodepthOptions:
         self.parser.add_argument("--height",
                                  type=int,
                                  help="input image height",
-                                 default=320) # for scared data 960//5, default=192, for scared : 256x320
+                                 default=192) # for scared data 960//5, default=192, for scared : 256x320
         self.parser.add_argument("--width",
                                  type=int,
                                  help="input image width",
-                                 default=320) # for scared data 1280//5, default=192
+                                 default=192) # for scared data 1280//5, default=192
         self.parser.add_argument("--disparity_smoothness",
                                  type=float,
                                  help="disparity smoothness weight",
-                                 default=1e-4)#1e-4
+                                 default=0)#1e-4
         self.parser.add_argument("--position_smoothness",
                                  type=float,
                                  help="registration smoothness weight",
@@ -262,6 +262,7 @@ class MonodepthOptions:
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
                                  default = None, 
+                                 # default = '/code/data2/models_disc_prior_logging/pose_consistency_working_0.0001/models/weights_19', 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
                                  # default = '/code/code/4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_True_gauss_num_1_batchnorm_True_ssim_l1_0.65_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_23',
@@ -272,8 +273,8 @@ class MonodepthOptions:
                                  type=str,
                                  help="models to load",
                                  # default = None)
-                                 default = ["decompose", 'sigma_combined', 'gaussian1'] )
-                              #    default=["pose_encoder", "pose", "depth", "encoder"])
+                                 # default = ["decompose", 'sigma_combined', 'gaussian1'] )
+                                 default=["pose_encoder", "pose", "depth", "encoder"])
                               #    default=["position_encoder", "position"])
 
         # LOGGING options

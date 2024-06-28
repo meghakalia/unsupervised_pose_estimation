@@ -111,6 +111,11 @@ class Trainer:
         
         if self.opt.longterm_consistency_loss:
             self.longterm_consistency_criterion = nn.MSELoss()
+        
+        if self.opt.split == "endoSLAM":
+            # self.depth_endoslam_loss = nn.MSELoss()
+            self.depth_endoslam_loss = SLlog()
+            
             
         if self.opt.adversarial_prior: 
             
@@ -323,8 +328,8 @@ class Trainer:
         if self.opt.pose_prior:
             fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5_pose_explicit.txt")
         else:
-            if self.opt.split == "endoSLAM":
-                fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_endoSLAMUnity.txt")
+            if self.opt.split == "endoSLAM": 
+                fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_ColonendoSLAMUnity.txt")
             else:
                 fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
         
@@ -487,7 +492,7 @@ class Trainer:
                     
                 self.log_wand("val2", traj_outputs, traj_losses, self.wanb_obj, step = self.epoch, character="trajectory")
             
-            if self.epoch > 5 and (self.epoch + 1) % self.opt.save_frequency == 0:
+            if self.epoch >= 0 and (self.epoch + 1) % self.opt.save_frequency == 0:
                 self.save_model()
         self.wanb_obj.finishWandb()
 
@@ -1558,6 +1563,12 @@ class Trainer:
                 axisangle_trans_5 = torch.cat([outputs[("axisangle", 0, frame_id)][:, 0, :, :2], outputs[("translation", 0, frame_id)][:, 0, :, :]], 2)
                 prior_axisangle_trans_5 = inputs[('pose_prior', frame_id)][:,:5][:, None, :]
                 pose_loss+=self.pose_criterion(axisangle_trans_5, prior_axisangle_trans_5) # check this
+                
+        if self.opt.split == "endoSLAM":
+            pred_depth = outputs[('disp', 0)]*inputs[("endoslam_mask", 0)][:, 0, :, :][:, None, :, :]
+            gt_depth = (inputs[("color_depth", 0, 0)]*inputs[("endoslam_mask", 0)])[:, 0, :, :][:, None, :, :]
+            depth_loss_endoslam = self.depth_endoslam_loss(pred_depth, gt_depth)
+        
         
         if self.opt.longterm_consistency_loss:        
             long_term_consistency_loss = self.longterm_consistency_criterion(outputs[("eulerTanslation_lonterm")], outputs[("eulerTanslation_serial")])
@@ -1746,6 +1757,9 @@ class Trainer:
         if self.opt.longterm_consistency_loss:
             losses["loss"]+=(losses["long_term_consistency_loss"]*self.opt.longterm_consistency_weight)
             
+        if self.opt.split == "endoSLAM":
+            losses["depth_mse"] = depth_loss_endoslam
+            losses["loss"]+=depth_loss_endoslam
             
         return losses
 
