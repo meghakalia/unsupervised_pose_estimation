@@ -248,6 +248,8 @@ class Trainer:
             self.models["pre_trained_generator"].load_state_dict(torch.load("saved_models/%s-%s-G_AB-%dep.pth" % (network_name, dataset_name, epoch_name)))
             
             self.gen_transform = transforms.Grayscale()
+            
+            self.depth_gan_log_loss = SLlog()
             # self.normalize_transform = transforms.Normalize(0.5, 0.5)
             
         self.models["encoder"] = networks.ResnetEncoder(
@@ -1408,7 +1410,7 @@ class Trainer:
  
         if self.opt.pre_trained_generator:
             
-            image = self.gen_transform(inputs[("color", 0, 0)])
+            image = self.gen_transform(inputs[("color_aug", 0, 0)])
             fake_B1 = self.models["pre_trained_generator"](image)
             # fake_B1_norm = 1.0 - Rescale(fake_B1)()
             
@@ -1608,7 +1610,7 @@ class Trainer:
                 
         if self.opt.pre_trained_generator:
             
-            image = self.gen_transform(inputs[("color", 0, 0)])
+            image = self.gen_transform(inputs[("color_aug", 0, 0)])
             fake_B1 = self.models["pre_trained_generator"](image)
             # fake_B1_norm = 1.0 - Rescale(fake_B1)()
             
@@ -1620,11 +1622,12 @@ class Trainer:
                 disp = F.interpolate(
                     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
                 
-                gan_loss = self.si_loss(fake_disp_scaled,disp)
+                gan_loss = self.depth_gan_log_loss(fake_disp_scaled,disp)
+                # gan_loss = self.si_loss(fake_disp_scaled,disp)
             
                 losses["gan_loss/{}".format(scale)] = gan_loss
                 
-                gan_loss_total= gan_loss_total + gan_loss
+                gan_loss_total = gan_loss_total + gan_loss
         
             # get disp at multiple scales, upscale and then compare with the GAN output.
             

@@ -9,14 +9,15 @@ from torch.utils.data import DataLoader
 from layers import transformation_from_parameters_euler, transformation_from_parameters # transformation_from_parameters, 
 from utils import readlines
 from options_eval import MonodepthEvalOptions
-# from datasets import LungRAWDataset
-from datasets import endoSLAMRAWDataset
+from datasets import LungRAWDataset
+# from datasets import endoSLAMRAWDataset
+# from datasets import endoSLAMRAWDataset
 from torchvision.utils import save_image
 import matplotlib.pyplot as plt
 import matplotlib
 
-matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
-# matplotlib.use('TkAgg',force=True)
+# matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
+matplotlib.use('TkAgg',force=True)
 
 def sample_filenames_frequency(filenames, sampling_frequency):
     outputfilenames = []
@@ -164,7 +165,7 @@ def plotTrajectory(pred_poses, gt_local_poses, save_fig = False, name = 0):
     if save_fig:
         plt.savefig('pose_prior_{}.png'.format(name),dpi=600)
     
-    # plt.show()
+    plt.show()
     
     # plt.clf()
     #  # distance plot 
@@ -232,7 +233,7 @@ def evaluate(opt):
         filenames_1 = readlines(
             os.path.join(os.path.dirname(__file__), "splits", "endovis",
                         "test_files_phantom_{}.txt".format(num)))
-        filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)[:50]
+        filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)[1:50]
         
         # filenames = filenames_1
         # dataset = SCAREDRAWDataset(opt.data_path, filenames, opt.height, opt.width,
@@ -242,7 +243,7 @@ def evaluate(opt):
         
         dataset = LungRAWDataset(
                 opt.data_path, filenames, opt.height, opt.width,
-                [0, 1, -1], 4, is_train=False, len_ct_depth_data = len(filenames), data_augment = False, sampling_frequency = 3)
+                [0, 1, -1], 4, is_train=False, len_ct_depth_data = len(filenames), data_augment = False, sampling_frequency = 3, depth_prior = False)
         
         dataloader = DataLoader(dataset, 1, shuffle=False, drop_last=False, pin_memory=True)
         
@@ -364,10 +365,11 @@ def evaluate(opt):
                         
                         gauss_mask_combined.append(gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
                     
-                    mask = torch.cat(gauss_mask_combined, 1).sum(1)/(len(opt.frame_ids)*2) # len(opt.frame_ids)*3
+                    # mask = torch.cat(gauss_mask_combined, 1).sum(1)/(len(opt.frame_ids)*2) # len(opt.frame_ids)*3
+                    mask, idx = torch.min(torch.cat(gauss_mask_combined, 1), 1, keepdim = True) 
                     
                     mask[mask < 0.6] = 0
-                    mask = mask[:, None, :, :]
+                    # mask = mask[:, None, :, :]
                     mask_t = torch.ones(mask.shape).cuda()
                     mask_t[mask == 0] = 0
                     
@@ -397,9 +399,9 @@ def evaluate(opt):
                     transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0], invert = False).cpu().numpy())
                 
         # if want to save
-        # np.savez('pose_prediction_{}.npz'.format(num), pred_poses)
-        # np.savez('axisangle_{}.npz'.format(num), axisangle_)
-        # np.savez('translation_{}.npz'.format(num), translation_)
+        np.savez('pose_prediction_{}.npz'.format(num), pred_poses)
+        np.savez('axisangle_{}.npz'.format(num), axisangle_)
+        np.savez('translation_{}.npz'.format(num), translation_)
         
         pred_poses = np.concatenate(pred_poses)
 

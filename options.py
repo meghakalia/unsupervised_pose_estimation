@@ -62,22 +62,22 @@ class MonodepthOptions:
         
         self.parser.add_argument("--pre_trained_generator",
                                  help="whether pretrained gan is on or off ",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="log_loss_colon_data")
+                                 default="log_loss_gan_multi_scale_consistency_losses")
         
         self.parser.add_argument("--split",
                                  type=str,
                                  help="which training split to use",
                                  choices=["endovis", "eigen_zhou", "eigen_full", "odom", "benchmark", "endoSLAM"],
-                                 default="endoSLAM")
+                                 default="endovis")
         
         self.parser.add_argument("--num_layers",
                                  type=int,
@@ -167,14 +167,17 @@ class MonodepthOptions:
                                  type=int,
                                  help="batch size",
                                  default=16)
+        
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",
                                  default=1e-6) # initial was 1e-4
+        
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
                                  default=20)
+        
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
                                  help="step size of the scheduler",
@@ -199,24 +202,28 @@ class MonodepthOptions:
         
         self.parser.add_argument("--enable_endoMasking",
                         help="if set, doesn't do auto-masking",
-                        action="store_false")
+                        action="store_true")
          
         self.parser.add_argument("--predictive_mask",
                                  help="if set, uses a predictive masking scheme as in Zhou et al",
                                  action="store_true")
+        
         self.parser.add_argument("--no_ssim",
                                  help="if set, disables ssim in the loss",
                                  action="store_true")
+        
         self.parser.add_argument("--weights_init",
                                  type=str,
                                  help="pretrained or scratch",
                                  default="pretrained",
                                  choices=["pretrained", "scratch"])
+        
         self.parser.add_argument("--pose_model_input",
                                  type=str,
                                  help="how many images the pose network gets",
                                  default="pairs",
                                  choices=["pairs", "all"])
+        
         self.parser.add_argument("--pose_model_type",
                                  type=str,
                                  help="normal or shared",
@@ -234,7 +241,7 @@ class MonodepthOptions:
 
         # LOADING options
         self.parser.add_argument("--pose_consistency_loss",
-                                 action="store_true",
+                                 action="store_false",
                                  help="true or false")
         
         self.parser.add_argument("--pose_consistency_weight",
@@ -243,7 +250,7 @@ class MonodepthOptions:
                                  default=0.001)
         
         self.parser.add_argument("--longterm_consistency_loss",
-                                 action="store_true",
+                                 action="store_false",
                                  help="true or false")
         
         self.parser.add_argument("--longterm_consistency_weight",
@@ -287,6 +294,7 @@ class MonodepthOptions:
                                  type=int,
                                  help="number of batches between each tensorboard log",
                                  default=100)
+        
         self.parser.add_argument("--save_frequency",
                                  type=int,
                                  help="number of epochs between each save",
@@ -308,25 +316,31 @@ class MonodepthOptions:
         self.parser.add_argument("--disable_median_scaling",
                                  help="if set disables median scaling in evaluation",
                                  action="store_true")
+        
         self.parser.add_argument("--pred_depth_scale_factor",
                                  help="if set multiplies predictions by this number",
                                  type=float,
                                  default=1)
+        
         self.parser.add_argument("--ext_disp_to_eval",
                                  type=str,
                                  help="optional path to a .npy disparities file to evaluate")
+        
         self.parser.add_argument("--eval_split",
                                  type=str,
                                  default="endovis",
                                  choices=[
                                     "eigen", "eigen_benchmark", "benchmark", "odom_9", "odom_10", "endovis"],
                                  help="which split to run eval on")
+        
         self.parser.add_argument("--save_pred_disps",
                                  help="if set saves predicted disparities",
                                  action="store_true")
+        
         self.parser.add_argument("--no_eval",
                                  help="if set disables evaluation",
                                  action="store_true")
+        
         self.parser.add_argument("--eval_eigen_to_benchmark",
                                  help="if set assume we are loading eigen results from npy but "
                                       "we want to evaluate using the new benchmark.",

@@ -46,9 +46,9 @@ class wandb_logging:
         self.resize = transforms.Resize((self.config['height'], self.config['width']))
         
         if experiment_name:
-            wandb.init(project="endoslam", config=self.config, dir = 'data/logs')
+            wandb.init(project="Pose_prior_eulerAngle", config=self.config, dir = 'data/logs')
         else:
-            wandb.init(project="endoslam", config=self.config, dir = 'data/logs', name = experiment_name)
+            wandb.init(project="Pose_prior_eulerAngle", config=self.config, dir = 'data/logs', name = experiment_name)
         
         self.save_colored_depth = False
         
