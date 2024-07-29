@@ -189,8 +189,8 @@ class MonoDataset(data.Dataset):
                 return print('no file{}'.format(img_path))
 
             tiff_image = Image.open(os.path.join(img_path))
-            color = torch.from_numpy(np.array(tiff_image))
-            color = (color / 100) # assumotion the max visisble dep value is 100 mm 
+            color = torch.from_numpy(np.array(tiff_image)) # origial values are given
+            # color = (color / 100) # assumotion the max visisble dep value is 100 mm 
             inputs[('ct_prior', 0)] = self.resize_ct(color[None, :, :])
             
             # color = self.loader(img_path)

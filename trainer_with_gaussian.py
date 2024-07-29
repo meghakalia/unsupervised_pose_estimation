@@ -126,8 +126,8 @@ class Trainer:
                 
                 for i in range(len(self.opt.scales)):
                     input_shape[i] = (1, self.opt.width//2, self.opt.height//2)
-                    # self.Discriminator[i] = networks.Discriminator(input_shape[i])
-                    self.Discriminator[i] = networks.DiscriminatorUnet(input_shape[i])
+                    self.Discriminator[i] = networks.Discriminator(input_shape[i])
+                    # self.Discriminator[i] = networks.DiscriminatorUnet(input_shape[i])
                     self.Discriminator[i].to(self.device)
                     
                      # Adversarial ground truths
@@ -1232,9 +1232,9 @@ class Trainer:
                     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
                 source_scale = 0
 
-            # _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth) # this should be 0-1
+            _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth) # this should be 0-100
             
-            depth = disp_to_depth_no_scaling(disp) # this should be 0-1
+            # depth = disp_to_depth_no_scaling(disp) # this should be 0-1
 
             outputs[("depth", 0, scale)] = depth
 
@@ -1296,9 +1296,9 @@ class Trainer:
                     disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
                 source_scale = 0
 
-            # _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth) # this should be 0-1
+            _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth) # this should be 0-1
             
-            depth = disp_to_depth_no_scaling(disp) # this should be 0-1
+            # depth = disp_to_depth_no_scaling(disp) # this should be 0-1
 
             outputs[("depth", 0, scale)] = depth
 
@@ -1572,7 +1572,7 @@ class Trainer:
         if self.opt.adversarial_prior:
             # how far is the model from valid examples 
             self.Discriminator.eval()
-            output_disc = self.Discriminator(outputs[("depth", 0, 0)])
+            output_disc = self.Discriminator(outputs[("depth", 0, 0)]*inputs[("gauss_mask", 0)])
             disc_loss = self.criterion_Discriminator(output_disc, self.valid)
             losses["depth_loss/{}".format(0)] = disc_loss
             

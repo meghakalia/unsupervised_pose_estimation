@@ -414,9 +414,9 @@ def evaluate(opt):
                 # out = get_transform(axisangle[:, 0], translation[:, 0])
                 
         # if want to save
-        np.savez('pose_prediction_{}.npz'.format(num), a = pred_poses)
-        np.savez('eulerangle_{}.npz'.format(num), a = axisangle_)
-        np.savez('translation_{}.npz'.format(num), a = translation_)
+        # np.savez('pose_prediction_{}.npz'.format(num), a = pred_poses)
+        # np.savez('eulerangle_{}.npz'.format(num), a = axisangle_)
+        # np.savez('translation_{}.npz'.format(num), a = translation_)
         
         # load the files 
         # b = np.load('axisangle_14.npz')

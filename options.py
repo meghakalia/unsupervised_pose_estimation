@@ -74,7 +74,7 @@ class MonodepthOptions:
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="discriminator_with_consistency_losses")
+                                 default="corrected_discriminator_with_consistency_losses_pretrained_networks")
         
         self.parser.add_argument("--split",
                                  type=str,
@@ -154,12 +154,12 @@ class MonodepthOptions:
         self.parser.add_argument("--min_depth",
                                  type=float,
                                  help="minimum depth",
-                                 default=0.001)
+                                 default=0.000001)
         
         self.parser.add_argument("--max_depth",
                                  type=float,
                                  help="maximum depth",
-                                 default=1.0) # 150.0
+                                 default=100.0) # 150.0
         
         self.parser.add_argument("--use_stereo",
                                  help="if set, uses stereo pair for training",
@@ -287,7 +287,7 @@ class MonodepthOptions:
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
                                  # default = None, 
-                                 default = '/code/data/models_disc_prior_logging/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19',
+                                 default = '/code/data/models_disc_prior_logging/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19', # use a pretrained network to improve
                                  # default = '/code/data2/models_disc_prior_logging/pose_consistency_working_0.0001/models/weights_19', 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
