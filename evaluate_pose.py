@@ -6,7 +6,7 @@ import networks
 import numpy as np
 import math
 from torch.utils.data import DataLoader
-from layers import transformation_from_parameters_euler, transformation_from_parameters # transformation_from_parameters, 
+from layers import transformation_from_parameters_euler, transformation_from_parameters,euler_angles_to_matrix # transformation_from_parameters, 
 from utils import readlines
 from options_eval import MonodepthEvalOptions
 from datasets import LungRAWDataset
@@ -205,6 +205,17 @@ def dump(source_to_target_transformations):
         Ms.append(cam_to_world)
     return Ms
 
+def get_transform(euler, translation):
+    # the output of the network is in radians
+    final_mat       = np.eye(4)
+    final_mat[:3,:3]    = R.from_euler('zyx', euler.cpu().numpy().squeeze()).as_matrix()
+    
+    T = np.eye(4)
+    T[:3,3] = translation.cpu().numpy().squeeze()
+    M = np.matmul(T, final_mat)
+    return M
+    
+    
 def dump_gt_new(source_to_target_transformations):
     Ms = []
     cam_to_world = np.eye(4)
@@ -399,10 +410,13 @@ def evaluate(opt):
                 pred_poses.append(
                     transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0], invert = False).cpu().numpy())
                 
+                # NOTE: the output of the network is in radians 
+                # out = get_transform(axisangle[:, 0], translation[:, 0])
+                
         # if want to save
-        # np.savez('pose_prediction_{}.npz'.format(num), a = pred_poses)
-        # np.savez('eulerangle_{}.npz'.format(num), a = axisangle_)
-        # np.savez('translation_{}.npz'.format(num), a = translation_)
+        np.savez('pose_prediction_{}.npz'.format(num), a = pred_poses)
+        np.savez('eulerangle_{}.npz'.format(num), a = axisangle_)
+        np.savez('translation_{}.npz'.format(num), a = translation_)
         
         # load the files 
         # b = np.load('axisangle_14.npz')

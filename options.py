@@ -299,8 +299,8 @@ class MonodepthOptions:
                                  type=str,
                                  help="models to load",
                                  # default = None)
-                                 # default = ["decompose", 'sigma_combined', 'gaussian1'] )
-                                 default=["pose_encoder", "pose", "depth", "encoder", "decompose", 'sigma_combined', 'gaussian1'])
+                                 default = ["decompose", 'sigma_combined', 'gaussian1'] )
+                                 # default=["pose_encoder", "pose", "depth", "encoder", "decompose", 'sigma_combined', 'gaussian1'])
                               #    default=["position_encoder", "position"])
 
         # LOGGING options
