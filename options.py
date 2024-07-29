@@ -27,15 +27,18 @@ class MonodepthOptions:
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default="/code/data/models_disc_prior_logging")
+                                 default="/code/data2/models_disc_prior_logging")
+        
         self.parser.add_argument("--gauss_number",
                                    type=int,
                                    help="gaussin number in gauss decomposition",
                                    default=2)
+        
         self.parser.add_argument("--gauss_lr",
                                    type=float,
                                    help="gaussin number in gauss decomposition",
                                    default=10e-8)
+        
         self.parser.add_argument("--gauss_scheduler_step_size",
                                    type=int,
                                    help="gaussin number in gauss decomposition",
@@ -62,7 +65,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--pre_trained_generator",
                                  help="whether pretrained gan is on or off ",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
@@ -71,7 +74,7 @@ class MonodepthOptions:
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="log_loss_gan_multi_scale_consistency_losses")
+                                 default="discriminator_with_consistency_losses")
         
         self.parser.add_argument("--split",
                                  type=str,
@@ -84,30 +87,37 @@ class MonodepthOptions:
                                  help="number of resnet layers",
                                  default=18,
                                  choices=[18, 34, 50, 101, 152])
+        
         self.parser.add_argument("--dataset",
                                  type=str,
                                  help="dataset to train on",
                                  default="endovis",
                                  choices=["endovis", "kitti", "kitti_odom", "kitti_depth", "kitti_test", "vnb", "porcine", "endoSLAM"])
+        
         self.parser.add_argument("--png",
                                  help="if set, trains from raw KITTI png files (instead of jpgs)",
                                  action="store_true")
+        
         self.parser.add_argument("--height",
                                  type=int,
                                  help="input image height",
                                  default=192) # for scared data 960//5, default=192, for scared : 256x320
+        
         self.parser.add_argument("--width",
                                  type=int,
                                  help="input image width",
                                  default=192) # for scared data 1280//5, default=192
+        
         self.parser.add_argument("--disparity_smoothness",
                                  type=float,
                                  help="disparity smoothness weight",
                                  default=0)#1e-4
+        
         self.parser.add_argument("--position_smoothness",
                                  type=float,
                                  help="registration smoothness weight",
                                  default=1e-3)
+        
         self.parser.add_argument("--consistency_constraint",
                                  type=float,
                                  help="consistency constraint weight",
@@ -119,34 +129,42 @@ class MonodepthOptions:
                                  type=float,
                                  help="epipolar constraint weight",
                                  default=0.01)
+        
         self.parser.add_argument("--geometry_constraint",
                                  type=float,
                                  help="geometry constraint weight",
                                  default=0.01)
+        
         self.parser.add_argument("--transform_constraint",
                                  type=float,
                                  help="transform constraint weight",
                                  default=0.01)
+        
         self.parser.add_argument("--transform_smoothness",
                                  type=float,
                                  help="transform smoothness weight",
                                  default=0.01)
+        
         self.parser.add_argument("--scales",
                                  nargs="+",
                                  type=int,
                                  help="scales used in the loss",
                                  default=[0, 1, 2, 3])
+        
         self.parser.add_argument("--min_depth",
                                  type=float,
                                  help="minimum depth",
                                  default=0.001)
+        
         self.parser.add_argument("--max_depth",
                                  type=float,
                                  help="maximum depth",
                                  default=1.0) # 150.0
+        
         self.parser.add_argument("--use_stereo",
                                  help="if set, uses stereo pair for training",
                                  action="store_true")
+        
         self.parser.add_argument("--frame_ids",
                                  nargs="+",
                                  type=int,
@@ -155,7 +173,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--eval_pose_trajectory",
                                  help="this will evaluate the model performance on trajectory",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--tra_path",
                                  type=str,
@@ -268,7 +286,8 @@ class MonodepthOptions:
         
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
-                                 default = None, 
+                                 # default = None, 
+                                 default = '/code/data/models_disc_prior_logging/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19',
                                  # default = '/code/data2/models_disc_prior_logging/pose_consistency_working_0.0001/models/weights_19', 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
@@ -281,7 +300,7 @@ class MonodepthOptions:
                                  help="models to load",
                                  # default = None)
                                  # default = ["decompose", 'sigma_combined', 'gaussian1'] )
-                                 default=["pose_encoder", "pose", "depth", "encoder"])
+                                 default=["pose_encoder", "pose", "depth", "encoder", "decompose", 'sigma_combined', 'gaussian1'])
                               #    default=["position_encoder", "position"])
 
         # LOGGING options
@@ -352,7 +371,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--adversarial_prior",
                                  help="whether we want to include the prior unity CT labels for depth",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--discriminator_lr", type=float, default=0.0002, help="adam: learning rate")
         self.parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")

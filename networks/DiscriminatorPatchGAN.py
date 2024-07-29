@@ -40,10 +40,10 @@ class DiscriminatorUnet(nn.Module):
 
         channels, height, width = input_shape
 
-        self.output_shape = input_shape
+        # self.output_shape = input_shape
         
         # Calculate output shape of image discriminator (PatchGAN)
-        # self.output_shape = (1, height // 2 ** 4, width // 2 ** 4)
+        self.output_shape = (1, height // 2 ** 4, width // 2 ** 4)
         
         
         

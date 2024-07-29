@@ -36,7 +36,7 @@ def main():
     for j in range(len(learning_rate_opt)):
         frac = 0.65
         learn_rate = 10**(-float(learning_rate_opt[j]))
-        frequency = 2
+        frequency = 5
         trainer = Trainer(opts, lr = learn_rate, sampling=frequency, frac = frac)
         trainer.train()
     # 

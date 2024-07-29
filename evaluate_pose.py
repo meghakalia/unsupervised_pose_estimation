@@ -16,8 +16,8 @@ from torchvision.utils import save_image
 import matplotlib.pyplot as plt
 import matplotlib
 
-# matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
-matplotlib.use('TkAgg',force=True)
+matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
+# matplotlib.use('TkAgg',force=True)
 
 def sample_filenames_frequency(filenames, sampling_frequency):
     outputfilenames = []
@@ -165,7 +165,7 @@ def plotTrajectory(pred_poses, gt_local_poses, save_fig = False, name = 0):
     if save_fig:
         plt.savefig('pose_prior_{}.png'.format(name),dpi=600)
     
-    plt.show()
+    # plt.show()
     
     # plt.clf()
     #  # distance plot 
@@ -234,6 +234,7 @@ def evaluate(opt):
             os.path.join(os.path.dirname(__file__), "splits", "endovis",
                         "test_files_phantom_{}.txt".format(num)))
         filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)[1:50]
+        # filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)
         
         # filenames = filenames_1
         # dataset = SCAREDRAWDataset(opt.data_path, filenames, opt.height, opt.width,
@@ -390,8 +391,8 @@ def evaluate(opt):
 
                 features = [pose_encoder(all_color_aug)]
                 axisangle, translation = pose_decoder(features)
-                # axisangle_.append(axisangle[:, 0].cpu().numpy())
-                # translation_.append(translation[:, 0].cpu().numpy())
+                axisangle_.append(axisangle[:, 0].cpu().numpy())
+                translation_.append(translation[:, 0].cpu().numpy())
 
                 # pred_poses.append(
                 #     transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0]).cpu().numpy())
@@ -399,9 +400,13 @@ def evaluate(opt):
                     transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0], invert = False).cpu().numpy())
                 
         # if want to save
-        np.savez('pose_prediction_{}.npz'.format(num), pred_poses)
-        np.savez('axisangle_{}.npz'.format(num), axisangle_)
-        np.savez('translation_{}.npz'.format(num), translation_)
+        # np.savez('pose_prediction_{}.npz'.format(num), a = pred_poses)
+        # np.savez('eulerangle_{}.npz'.format(num), a = axisangle_)
+        # np.savez('translation_{}.npz'.format(num), a = translation_)
+        
+        # load the files 
+        # b = np.load('axisangle_14.npz')
+        # b['a'].shape
         
         pred_poses = np.concatenate(pred_poses)
 

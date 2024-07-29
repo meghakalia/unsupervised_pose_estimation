@@ -50,7 +50,7 @@ class MonoDataset(data.Dataset):
                  adversarial_prior = False, 
                  data_augment = True, 
                  pose_prior = False, 
-                 depth_prior = True
+                 depth_prior = False
                  ):
         super(MonoDataset, self).__init__()
 
@@ -78,6 +78,7 @@ class MonoDataset(data.Dataset):
         self.sampling_frequency = sampling_frequency
         self.pose_prior = pose_prior
         
+        self.resize_ct = transforms.Resize((self.height, self.width), interpolation=transforms.InterpolationMode.BILINEAR)
         # We need to specify augmentations differently in newer versions of torchvision.
         # We first try the newer tuple version; if this fails we fall back to scalars
         try:
@@ -174,22 +175,27 @@ class MonoDataset(data.Dataset):
         """
         
         # sample random number between 1 to the sampling frequency inclusive. 
-        # curr_sampling_rate = np.random.randint(1, self.sampling_frequency, size=1)[0]
-        curr_sampling_rate = self.sampling_frequency # for colonoscopy 
+        curr_sampling_rate = np.random.randint(1, self.sampling_frequency, size=1)[0]
+        # curr_sampling_rate = self.sampling_frequency # for colonoscopy 
         inputs = {}
 
-        
-            
+
         if self.adversarial_prior:
             # generate a random index. 
             image_idx = torch.randint(self.len_ct_depth_data, (1,))
-            img_path = os.path.join('data/prior', 'rgb_{}.png'.format(image_idx[0]+1))
+            # img_path = os.path.join('data/prior', 'rgb_{}.png'.format(image_idx[0]+1))
+            img_path = os.path.join('data/prior2_tiff', 'depth_{}.tiff'.format(image_idx[0]+1))
             if not os.path.isfile(img_path):
                 return print('no file{}'.format(img_path))
-            color = self.loader(img_path)
-            # frame_index, folder, side = self.get_folder_path(self.filenames_ct_prior[image_idx])
-            # img = self.get_color(folder, frame_index, side, do_flip = False)
-            inputs[('ct_prior', 0)] = self.to_tensor(self.transforms_ct_depth(self.resize[0](color)))[0][None, :, :]
+
+            tiff_image = Image.open(os.path.join(img_path))
+            color = torch.from_numpy(np.array(tiff_image))
+            color = (color / 100) # assumotion the max visisble dep value is 100 mm 
+            inputs[('ct_prior', 0)] = self.resize_ct(color[None, :, :])
+            
+            # color = self.loader(img_path)
+            # inputs[('ct_prior', 0)] = self.to_tensor(self.transforms_ct_depth(self.resize[0](color)))[0][None, :, :]
+        
             
             
         if self.data_aug: 

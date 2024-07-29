@@ -26,10 +26,10 @@ def parse_args():
         description='Simple testing funtion for Monodepthv2 models.')
     parser.add_argument('--image_path', type=str,
                         help='path to a test image or folder of images',
-                        default = 'data2/dataset_14/keyframe_1')
+                        default = 'data/dataset_14/keyframe_1')
     parser.add_argument('--output_dir', type=str,
                         help='path to a test image or folder of images',
-                        default = 'data2/dataset_14/keyframe_1/results')
+                        default = 'data/dataset_14/keyframe_1/results')
     
     parser.add_argument('--output_folderName', type=str,
                         help='path to a test image or folder of images',
@@ -38,7 +38,7 @@ def parse_args():
     
     parser.add_argument('--model_path', type=str,
                         # help='path to the test model', default ='/code/data/models_depth_scaled/mdp/models/weights_9') #models_pretrained/Model_MIA")
-                        help='path to the test model', default ='/code/data2/models_disc_prior_logging/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19') #models_pretrained/Model_MIA")
+                        help='path to the test model', default ='/code/data/models_disc_prior_logging/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19') #models_pretrained/Model_MIA")
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="png")
     parser.add_argument("--no_cuda",

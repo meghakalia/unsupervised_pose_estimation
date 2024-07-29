@@ -53,8 +53,6 @@ class Trainer:
         self.min_std_trajectory_ates = 1000000
         self.min_std_trajectory_res = 1000000
         
-        
-        
         if options.wandb_sweep: 
             # self.wanb_obj = wandb_logging.wandb_logging(options)
             # self.wandb_config = self.wanb_obj.get_config()
@@ -320,10 +318,7 @@ class Trainer:
         else:
             datasets_dict = {"endovis": datasets.LungRAWDataset}
             
-        # 
-        
-        # 
-    
+
 
         self.dataset = datasets_dict[self.opt.dataset]
 
@@ -348,7 +343,7 @@ class Trainer:
 
         train_dataset = self.dataset(
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, data_augment = False, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2271, sampling_frequency = self.sampling_frequency, pose_prior = self.opt.pose_prior )
+            self.opt.frame_ids, 4, data_augment = True, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2082, sampling_frequency = self.sampling_frequency, pose_prior = self.opt.pose_prior )
         
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True,
@@ -401,7 +396,7 @@ class Trainer:
 
             
             # gt poses 
-            self.gt_local_poses_14 = np.load(fpath_gt.format("14"), fix_imports=True, encoding='latin1')["data"]
+            self.gt_local_poses_14 = np.load(fpath_gt.format("13"), fix_imports=True, encoding='latin1')["data"]
             self.gt_local_poses_1 = np.load(fpath_gt.format("1"), fix_imports=True, encoding='latin1')["data"]
             
         
@@ -559,18 +554,10 @@ class Trainer:
                     
                     # multiply inputs with it: 
                     for frame_id in self.opt.frame_ids:
+                        inputs["color_aug_original", frame_id, s] = inputs["color_aug", frame_id, s]
                         inputs["color_aug", frame_id, s]=inputs["color_aug", frame_id, s]*mask_t # wrong there shouudl be no gradation
                         # save_image(inputs["color_aug", frame_id, s], f'image_{s}_fid_{frame_id}.png')
-                    
-                    # mask_original = torch.cat(gauss_mask_combined, 1)
-                    # test_mask = torch.zeros(mask_original.shape).cuda()
-                    # test_mask[mask_original<0.6] = 1
-                    # new_test_mask = test_mask.sum(1)/9
-                    # new_test_mask2 = torch.ones(new_test_mask.shape).cuda()
-                    # new_test_mask2[new_test_mask==1] = 0
-            # add in the same optimizer 
-            # update the inputs after decompose
-            # process and update inputs here 
+                  
             if self.opt.gaussian_correction: 
                 # self.set_train_gauss()
                 self.set_eval_gauss()
@@ -627,7 +614,6 @@ class Trainer:
                 # gaussian_reponse['reconstructed'].append(re_composed[0, :, :, :]) 
                 gaussian_reponse['decomposed'].append(decomposed[0, :, :, :]) 
                     
-                    
             # caculate the loss using decomposed output 
             if self.opt.gaussian_correction:
                 outputs, losses = self.process_batch_gauss(inputs)
@@ -656,7 +642,6 @@ class Trainer:
             self.model_optimizer.step()
             
             # backward step with the gaussian networks
-            
             if self.opt.adversarial_prior:
                 d_loss+=self.discriminator_train_step(inputs,outputs)
             
@@ -725,14 +710,14 @@ class Trainer:
         self.Discriminator.train()
         self.optimizer_Discriminator.zero_grad()
 
-        ct_loss_disc = self.Discriminator(inputs[('ct_prior', 0)])
+        ct_loss_disc = self.Discriminator(inputs[('ct_prior', 0)]*inputs[("gauss_mask", 0)].detach()) # check size for valid. inputs[("gauss_mask", s)]
         loss_real = self.criterion_Discriminator(ct_loss_disc, self.valid)
         
         self.disc_response[('disc_response_ct')] = ct_loss_disc
         
         loss_fake = 0 
         for scale in self.opt.scales:
-            depth_disc_res = self.Discriminator(outputs[("depth", 0, scale)].detach())
+            depth_disc_res = self.Discriminator((outputs[("depth", 0, scale)]*inputs[("gauss_mask", 0)]).detach())
             self.disc_response[('disc_response', scale)] = depth_disc_res
             loss_fake+=self.criterion_Discriminator(depth_disc_res, self.fake)
             
@@ -1191,6 +1176,7 @@ class Trainer:
                     new_mask = inputs[("gauss_mask", s)]
                     mask_t[new_mask == 0] = 0
                     for frame_id in self.opt.frame_ids:
+                        inputs["color_aug_original", frame_id, s] = inputs["color_aug", frame_id, s]
                         inputs["color_aug", frame_id, s]=inputs["color_aug", frame_id, s]*mask_t
                         
             if self.opt.enable_endoMasking:
@@ -1203,7 +1189,8 @@ class Trainer:
                         idx, mask_ = inputs["color", frame_id, s].min(1)
                         mask_ = mask_[:, None, :, :]
                         mask_new = torch.cat([mask_, mask_, mask_], 1)
-                        mask_endo[mask_new==0] = 0 
+                        mask_endo[mask_new==0] = 0
+                        
                         inputs["color_aug", frame_id, s] = inputs["color_aug", frame_id, s]*mask_endo
                         
                         inputs.update({("endoslam_mask", s):mask_endo})
@@ -1410,12 +1397,18 @@ class Trainer:
  
         if self.opt.pre_trained_generator:
             
+            # Megha
             image = self.gen_transform(inputs[("color_aug", 0, 0)])
             fake_B1 = self.models["pre_trained_generator"](image)
             # fake_B1_norm = 1.0 - Rescale(fake_B1)()
             
+            # don't change this 
+            depth = disp_to_depth_no_scaling(disp)
+            
             _ , fake_disp_scaled = depth_to_disp(fake_B1)
             
+            
+                
             for scale in self.opt.scales:
                 disp = outputs[("disp", scale)]
                 # upscale 
@@ -1579,7 +1572,7 @@ class Trainer:
         if self.opt.adversarial_prior:
             # how far is the model from valid examples 
             self.Discriminator.eval()
-            output_disc = self.Discriminator(outputs[("depth", 0, 0)]) # this may not be correct because of the scale. check whether we want to miniize disp or depth
+            output_disc = self.Discriminator(outputs[("depth", 0, 0)])
             disc_loss = self.criterion_Discriminator(output_disc, self.valid)
             losses["depth_loss/{}".format(0)] = disc_loss
             
@@ -1610,19 +1603,25 @@ class Trainer:
                 
         if self.opt.pre_trained_generator:
             
-            image = self.gen_transform(inputs[("color_aug", 0, 0)])
+            image = self.gen_transform(inputs[("color_aug_original", 0, 0)])
             fake_B1 = self.models["pre_trained_generator"](image)
             # fake_B1_norm = 1.0 - Rescale(fake_B1)()
             
-            _ , fake_disp_scaled = depth_to_disp(fake_B1)
+            # _ , fake_disp_scaled = depth_to_disp(fake_B1)
             
             for scale in self.opt.scales:
-                disp = outputs[("disp", scale)]
+                # disp = outputs[("disp", scale)]
+                
+                depth = outputs[("depth", 0, scale)]
+                
                 # upscale 
                 disp = F.interpolate(
-                    disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+                    depth, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
                 
-                gan_loss = self.depth_gan_log_loss(fake_disp_scaled,disp)
+                if self.opt.enable_gauss_mask:
+                    fake_B1 = fake_B1*inputs[("gauss_mask", 0)]
+                    
+                gan_loss = self.depth_gan_log_loss(fake_B1,disp)
                 # gan_loss = self.si_loss(fake_disp_scaled,disp)
             
                 losses["gan_loss/{}".format(scale)] = gan_loss
@@ -1750,9 +1749,9 @@ class Trainer:
 
         total_loss /= self.num_scales
         if self.opt.pose_prior:
-            losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss + pose_loss
+            losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.002 * disc_loss + pose_loss
         else:
-            losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.002 + 0.02 * disc_loss 
+            losses["loss"] = total_loss + gan_loss_total/self.num_scales * 0.0002 + 0.002 * disc_loss 
             
         if self.opt.pose_consistency_loss:
             losses["loss"]+=(pose_consistency_loss*self.opt.pose_consistency_weight)
