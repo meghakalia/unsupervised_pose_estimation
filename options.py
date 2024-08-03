@@ -27,7 +27,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default="/code/data2/models_disc_prior_logging")
+                                 default="/code/data/Training/processed/data/models")
         
         self.parser.add_argument("--gauss_number",
                                    type=int,
@@ -74,7 +74,7 @@ class MonodepthOptions:
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="corrected_discriminator_with_consistency_losses_pretrained_networks")
+                                 default="phantom_all_pose_consistency_long_term")
         
         self.parser.add_argument("--split",
                                  type=str,
@@ -123,8 +123,6 @@ class MonodepthOptions:
                                  help="consistency constraint weight",
                                  default=0.01)
         
-        
-        
         self.parser.add_argument("--epipolar_constraint",
                                  type=float,
                                  help="epipolar constraint weight",
@@ -154,7 +152,7 @@ class MonodepthOptions:
         self.parser.add_argument("--min_depth",
                                  type=float,
                                  help="minimum depth",
-                                 default=0.000001)
+                                 default=1.0)
         
         self.parser.add_argument("--max_depth",
                                  type=float,
@@ -173,7 +171,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--eval_pose_trajectory",
                                  help="this will evaluate the model performance on trajectory",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--tra_path",
                                  type=str,
@@ -287,7 +285,8 @@ class MonodepthOptions:
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
                                  # default = None, 
-                                 default = '/code/data/models_disc_prior_logging/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19', # use a pretrained network to improve
+                                 default = '/code/data/Training/processed/data/models/gauss_mask_min_pose_longterm_consistency_0.0001/models/weights_19', 
+                                 # default = '/code/data/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19', # use a pretrained network to improve
                                  # default = '/code/data2/models_disc_prior_logging/pose_consistency_working_0.0001/models/weights_19', 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
                                  # default  = 'data_gan_depth_to_disp_/mdp/models/weights_19',
@@ -307,7 +306,7 @@ class MonodepthOptions:
         self.parser.add_argument("--sampling_frequency",
                                  type=int,
                                  help="sampling frequency of the frames, can be [1,2,3,4]",
-                                 default=1)
+                                 default=5)
         
         self.parser.add_argument("--log_frequency",
                                  type=int,
@@ -365,13 +364,17 @@ class MonodepthOptions:
                                       "we want to evaluate using the new benchmark.",
                                  action="store_true")
         
+        self.parser.add_argument("--pose_fw_color_prior",
+                                 help="whether we want to include colored forward backward images",
+                                 action="store_true")
+        
         self.parser.add_argument("--multiscale_adversarial_prior",
                                  help="whether we want to include the prior unity CT labels for depth",
                                  action="store_true") 
         
         self.parser.add_argument("--adversarial_prior",
                                  help="whether we want to include the prior unity CT labels for depth",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--discriminator_lr", type=float, default=0.0002, help="adam: learning rate")
         self.parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")

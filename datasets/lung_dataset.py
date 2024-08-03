@@ -29,6 +29,20 @@ class LungDataset(MonoDataset):
        
         return False
 
+    def get_gray(self, folder, frame_index, side, do_flip, resize = False):
+        path = self.get_image_path(folder, frame_index, side)
+        if not os.path.isfile(path):
+            return print('no file{%s}'.format(path))
+        gray = self.loader_gray(path)
+        
+        if resize: 
+            gray = self.resizeTransform(gray.crop((0, 0, gray.size[0], gray.size[1]-64))) # defined in base class
+        
+        if do_flip:
+            gray = gray.transpose(pil.FLIP_LEFT_RIGHT)
+
+        return gray
+        
     def get_color(self, folder, frame_index, side, do_flip, resize = False):
         path = self.get_image_path(folder, frame_index, side)
         if not os.path.isfile(path):
@@ -43,6 +57,7 @@ class LungDataset(MonoDataset):
 
         return color
     
+     
     def get_folder_path_pose_prior(self, filename):
         line = filename.split()
         folder = line[0]

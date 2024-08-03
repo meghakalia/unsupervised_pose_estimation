@@ -26,19 +26,19 @@ def parse_args():
         description='Simple testing funtion for Monodepthv2 models.')
     parser.add_argument('--image_path', type=str,
                         help='path to a test image or folder of images',
-                        default = 'data/dataset_14/keyframe_1')
+                        default = 'data2/24_07_2024_phantom2/processed_phantom_fullpaths/3/new_renamed')
     parser.add_argument('--output_dir', type=str,
                         help='path to a test image or folder of images',
-                        default = 'data/dataset_14/keyframe_1/results')
+                        default = 'data2/24_07_2024_phantom2/processed_phantom_fullpaths/results/gauss_mask_min_pose_longterm_consistency_0.0001')
     
     parser.add_argument('--output_folderName', type=str,
                         help='path to a test image or folder of images',
                         # default = 'correct_zero_padding_with_euler_gaussian_mask_uncertainty_0.0001')
-                        default = 'gauss_mask_min_pose_longterm_consistency_0.001')
+                        default = '3')
     
     parser.add_argument('--model_path', type=str,
                         # help='path to the test model', default ='/code/data/models_depth_scaled/mdp/models/weights_9') #models_pretrained/Model_MIA")
-                        help='path to the test model', default ='/code/data/models_disc_prior_logging/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19') #models_pretrained/Model_MIA")
+                        help='path to the test model', default ='/code/data/models_disc_prior_logging/gauss_mask_min_pose_longterm_consistency_0.0001/models/weights_19') #models_pretrained/Model_MIA")
     parser.add_argument('--ext', type=str,
                         help='image extension to search for in folder', default="png")
     parser.add_argument("--no_cuda",

@@ -328,10 +328,11 @@ class Trainer:
             if self.opt.split == "endoSLAM": 
                 fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_ColonendoSLAMUnity.txt")
             else:
-                fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
+                # fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
+                fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "phantom_all_{}.txt")
         
-        train_filenames = readlines(fpath.format("train"))[5:-5] # exclude frame accordingly
-        val_filenames = readlines(fpath.format("val"))[5:-5]
+        train_filenames = readlines(fpath.format("train")) # exclude frame accordingly
+        val_filenames = readlines(fpath.format("val"))
 
         # train_filenames = readlines(fpath.format("train"))[self.sampling_frequency+2:-self.sampling_frequency-6] # exclude frame accordingly
         # val_filenames = readlines(fpath.format("val"))[self.sampling_frequency+2:-self.sampling_frequency-6]
@@ -345,14 +346,13 @@ class Trainer:
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, data_augment = True, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2082, sampling_frequency = self.sampling_frequency, pose_prior = self.opt.pose_prior )
         
-        self.train_loader = DataLoader(
-            train_dataset, self.opt.batch_size, True,
-            drop_last=True)
+        self.train_loader = DataLoader(train_dataset, self.opt.batch_size, True, drop_last=True)
         
         # self.train_loader = DataLoader(
         #     train_dataset, self.opt.batch_size, True,
         #     num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
         
+        # NOTE: sampling_frequency = 2 shoudl be two to obtain a frequency of 1
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=False, data_augment = False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0, sampling_frequency = 2, pose_prior = self.opt.pose_prior)
@@ -361,14 +361,11 @@ class Trainer:
         #     val_dataset, self.opt.batch_size, True,
         #     num_workers=self.opt.num_workers, pin_memory=True, drop_last=True)
         
-        self.val_loader = DataLoader(
-            val_dataset, self.opt.batch_size, True, drop_last=True)
-        
+        self.val_loader = DataLoader(val_dataset, self.opt.batch_size, True, drop_last=True)
         self.val_iter = iter(self.val_loader)
 
         # for pose trajectory
-        if self.opt.eval_pose_trajectory:
-            
+        if self.opt.eval_pose_trajectory:  
             fpath_trajectory = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "test_files_phantom_{}.txt")
             fpath_gt = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "gt_poses_phantom_{}.npz")
             

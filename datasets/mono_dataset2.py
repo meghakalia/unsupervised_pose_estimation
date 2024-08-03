@@ -15,6 +15,12 @@ import torchvision.transforms.functional as TF
 
 ImageFile.LOAD_TRUNCATED_IMAGES=True
 
+def pil_loaded_gray(path):
+    with open(path, 'rb') as f:
+        with Image.open(f).convert('L') as img:
+            return img
+            
+    
 def pil_loader(path):
     # open path as file to avoid ResourceWarning
     # (https://github.com/python-pillow/Pillow/issues/835)
@@ -50,7 +56,9 @@ class MonoDataset(data.Dataset):
                  adversarial_prior = False, 
                  data_augment = True, 
                  pose_prior = False, 
-                 depth_prior = False
+                 depth_prior = False, 
+                 random_frequency = True, 
+                 pose_fw_color_prior = False
                  ):
         super(MonoDataset, self).__init__()
 
@@ -58,20 +66,22 @@ class MonoDataset(data.Dataset):
         self.len_ct_depth_data = len_ct_depth_data
         # self.filenames_ct_prior = filename_ct_prior
         
-        self.data_aug = data_augment
-        self.data_path = data_path
-        self.filenames = filenames
-        self.height = height
-        self.width = width
+        self.data_aug   = data_augment
+        self.data_path  = data_path
+        self.filenames  = filenames
+        self.height     = height
+        self.width      = width
         self.num_scales = num_scales
-        self.interp = Image.ANTIALIAS
-
-        self.frame_idxs = frame_idxs
+        self.interp     = Image.ANTIALIAS
+        self.random_frequency       = random_frequency
+        self.pose_fw_color_prior    = pose_fw_color_prior
+        self.frame_idxs             = frame_idxs
 
         self.is_train = is_train
         self.img_ext = img_ext
         self.depth_prior_endoslam = depth_prior
         self.loader = pil_loader
+        self.loader_gray = pil_loaded_gray
         self.to_tensor = transforms.ToTensor()
         self.to_PIL = transforms.ToPILImage()
         
@@ -175,11 +185,14 @@ class MonoDataset(data.Dataset):
         """
         
         # sample random number between 1 to the sampling frequency inclusive. 
-        curr_sampling_rate = np.random.randint(1, self.sampling_frequency, size=1)[0]
+        if self.random_frequency:
+            curr_sampling_rate = np.random.randint(1, self.sampling_frequency, size=1)[0]
+        else:
+            curr_sampling_rate = self.sampling_frequency # for colonoscopy 
+            
         # curr_sampling_rate = self.sampling_frequency # for colonoscopy 
         inputs = {}
-
-
+   
         if self.adversarial_prior:
             # generate a random index. 
             image_idx = torch.randint(self.len_ct_depth_data, (1,))
@@ -218,12 +231,17 @@ class MonoDataset(data.Dataset):
             inputs[('pose_prior', -1)] = torch.tensor([float(strings[11]), float(strings[12]), float(strings[13]), float(strings[14]), float(strings[15]), float(strings[16])])
             # inputs[('pose_prior', -1)] = torch.cat([float(strings[11]), float(strings[12]), float(strings[13]), float(strings[14]), float(strings[15]), float(strings[16])])
         
+        
+        if self.pose_fw_color_prior:
+            for i in self.frame_idxs:
+                inputs[("pose_fw_prior", i, -1)] = self.get_gray(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip)
+            
         for i in self.frame_idxs:
             if i == "s":
                 other_side = {"r": "l", "l": "r"}[side]
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
             else:
-                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip)
+                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
 
         if self.depth_prior_endoslam:
             inputs[("color_depth", 0, 0)] = self.to_tensor(self.get_depth_endoslam(folder, frame_index))

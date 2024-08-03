@@ -215,7 +215,6 @@ def get_transform(euler, translation):
     M = np.matmul(T, final_mat)
     return M
     
-    
 def dump_gt_new(source_to_target_transformations):
     Ms = []
     cam_to_world = np.eye(4)
@@ -240,11 +239,12 @@ def evaluate(opt):
     #                  "test_files_phantom14.txt"))[0:50]
     
     num = 14
-    for traj in range(18,19):
+    for traj in range(1,5):
         filenames_1 = readlines(
             os.path.join(os.path.dirname(__file__), "splits", "endovis",
-                        "test_files_phantom_{}.txt".format(num)))
-        filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)[1:50]
+                        "phantom2_fullLength_{}.txt".format(traj)))
+        filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 1)[1:-1]
+        # filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)[1:50]
         # filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)
         
         # filenames = filenames_1
@@ -255,7 +255,7 @@ def evaluate(opt):
         
         dataset = LungRAWDataset(
                 opt.data_path, filenames, opt.height, opt.width,
-                [0, 1, -1], 4, is_train=False, len_ct_depth_data = len(filenames), data_augment = False, sampling_frequency = 3, depth_prior = False)
+                [0, 1, -1], 4, is_train=False, len_ct_depth_data = len(filenames), data_augment = False, sampling_frequency = 1, depth_prior = False, random_frequency = False)
         
         dataloader = DataLoader(dataset, 1, shuffle=False, drop_last=False, pin_memory=True)
         
@@ -414,41 +414,41 @@ def evaluate(opt):
                 # out = get_transform(axisangle[:, 0], translation[:, 0])
                 
         # if want to save
-        # np.savez('pose_prediction_{}.npz'.format(num), a = pred_poses)
-        # np.savez('eulerangle_{}.npz'.format(num), a = axisangle_)
-        # np.savez('translation_{}.npz'.format(num), a = translation_)
+        np.savez('pose_prediction_freq_1_001_{}.npz'.format(traj), a = pred_poses)
+        np.savez('eulerangle_freq_1_001_{}.npz'.format(traj), a = axisangle_)
+        np.savez('translation_freq_1_001_{}.npz'.format(traj), a = translation_)
         
         # load the files 
         # b = np.load('axisangle_14.npz')
         # b['a'].shape
         
-        pred_poses = np.concatenate(pred_poses)
+    #     pred_poses = np.concatenate(pred_poses)
 
-        # change length here. 
-        gt_path = os.path.join(os.path.dirname(__file__), "splits", "endovis", "gt_poses_phantom_{}.npz".format(num))
-        gt_local_poses = np.load(gt_path, fix_imports=True, encoding='latin1')["data"][:50]
+    #     # change length here. 
+    #     gt_path = os.path.join(os.path.dirname(__file__), "splits", "endovis", "gt_poses_phantom_{}.npz".format(num))
+    #     gt_local_poses = np.load(gt_path, fix_imports=True, encoding='latin1')["data"][:50]
 
-        plotTrajectory(pred_poses, gt_local_poses, True, name = traj)
-    ates = []
-    res = []
-    # num_frames = gt_local_poses.shape[0]
-    num_frames = pred_poses.shape[0] - 3
-    track_length = 5
-    count = 0 
-    for i in range(0, num_frames - 1):
-        local_xyzs = np.array(dump_xyz(pred_poses[i:i + track_length - 1]))
-        gt_local_xyzs = np.array(dump_xyz(gt_local_poses[i:i + track_length - 1]))
-        local_rs = np.array(dump_r(pred_poses[i:i + track_length - 1]))
-        gt_rs = np.array(dump_r(gt_local_poses[i:i + track_length - 1]))
-        # if i + track_length - 1 > 50:
-        #     print('here')
-        # print(i + track_length - 1)
+    #     plotTrajectory(pred_poses, gt_local_poses, True, name = traj)
+    # ates = []
+    # res = []
+    # # num_frames = gt_local_poses.shape[0]
+    # num_frames = pred_poses.shape[0] - 3
+    # track_length = 5
+    # count = 0 
+    # for i in range(0, num_frames - 1):
+    #     local_xyzs = np.array(dump_xyz(pred_poses[i:i + track_length - 1]))
+    #     gt_local_xyzs = np.array(dump_xyz(gt_local_poses[i:i + track_length - 1]))
+    #     local_rs = np.array(dump_r(pred_poses[i:i + track_length - 1]))
+    #     gt_rs = np.array(dump_r(gt_local_poses[i:i + track_length - 1]))
+    #     # if i + track_length - 1 > 50:
+    #     #     print('here')
+    #     # print(i + track_length - 1)
 
-        ates.append(compute_ate(gt_local_xyzs, local_xyzs))
-        res.append(compute_re(local_rs, gt_rs))
+    #     ates.append(compute_ate(gt_local_xyzs, local_xyzs))
+    #     res.append(compute_re(local_rs, gt_rs))
         
-    print("\n   Trajectory error: {:0.4f}, std: {:0.4f}\n".format(np.mean(ates), np.std(ates)))
-    print("\n   Rotation error: {:0.4f}, std: {:0.4f}\n".format(np.mean(res), np.std(res)))
+    # print("\n   Trajectory error: {:0.4f}, std: {:0.4f}\n".format(np.mean(ates), np.std(ates)))
+    # print("\n   Rotation error: {:0.4f}, std: {:0.4f}\n".format(np.mean(res), np.std(res)))
 
     # get the error
     # save the image 

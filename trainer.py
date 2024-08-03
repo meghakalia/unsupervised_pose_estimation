@@ -270,7 +270,7 @@ class Trainer:
         if self.opt.use_pose_prior:
             fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5_pose_explicit.txt")
         else:
-            fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
+            fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "phantom_all_{}.txt")
         
         train_filenames = readlines(fpath.format("train")) # exclude frame accordingly
         val_filenames = readlines(fpath.format("val"))
@@ -289,9 +289,7 @@ class Trainer:
             self.opt.data_path, train_filenames, self.opt.height, self.opt.width,
             self.opt.frame_ids, 4, is_train=True, img_ext=img_ext, adversarial_prior = self.opt.adversarial_prior, len_ct_depth_data = 2271, sampling_frequency = self.sampling_frequency, pose_prior = self.opt.pose_prior )
         
-        self.train_loader = DataLoader(
-            train_dataset, self.opt.batch_size, True,
-            drop_last=True)
+        self.train_loader = DataLoader(train_dataset, self.opt.batch_size, True, drop_last=True)
         
         # self.train_loader = DataLoader(
         #     train_dataset, self.opt.batch_size, True,
@@ -299,7 +297,7 @@ class Trainer:
         
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width,
-            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0, sampling_frequency = 2, pose_prior = self.opt.pose_prior)
+            self.opt.frame_ids, 4, is_train=False, img_ext=img_ext, adversarial_prior = False, len_ct_depth_data = 0, sampling_frequency = 1, pose_prior = self.opt.pose_prior)
         
         # self.val_loader = DataLoader(
         #     val_dataset, self.opt.batch_size, True,
