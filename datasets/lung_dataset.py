@@ -73,6 +73,7 @@ class LungDataset(MonoDataset):
         line = filename.split()
         folder = line[0]
 
+        fw_ = folder.split('/')[-1]
         # implement a function to get data specific folder and frame_id
         if len(line) == 3:
             frame_index = int(line[1])
@@ -83,7 +84,7 @@ class LungDataset(MonoDataset):
             side = line[2]
         else:
             side = None
-        return frame_index, folder, side
+        return frame_index, folder, side, fw_
 
 
 class LungRAWDataset(LungDataset):

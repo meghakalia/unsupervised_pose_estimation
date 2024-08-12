@@ -222,7 +222,7 @@ class MonoDataset(data.Dataset):
         if self.pose_prior: 
             frame_index, folder, side = self.get_folder_path_pose_prior(self.filenames[index])
         else:          
-            frame_index, folder, side = self.get_folder_path(self.filenames[index]) # incorrect
+            frame_index, folder, side, fw = self.get_folder_path(self.filenames[index]) # incorrect
         
         if self.pose_prior:
             strings = self.filenames[index].split()
@@ -241,7 +241,14 @@ class MonoDataset(data.Dataset):
                 other_side = {"r": "l", "l": "r"}[side]
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
             else:
-                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
+                if fw == 'forward':
+                    inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
+                elif fw == 'backward':
+                     # flipping the frames
+                    inputs[("color", (-1)*i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
+                else:
+                    inputs[("color", (-1)*i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
+                    
 
         if self.depth_prior_endoslam:
             inputs[("color_depth", 0, 0)] = self.to_tensor(self.get_depth_endoslam(folder, frame_index))

@@ -27,7 +27,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default="/code/data/Training/processed/data/models")
+                                 default="/code/data/data/models/")
         
         self.parser.add_argument("--gauss_number",
                                    type=int,
@@ -67,14 +67,19 @@ class MonodepthOptions:
                                  help="whether pretrained gan is on or off ",
                                  action="store_true")
         
+        
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
                                  action="store_false")
         
+        self.parser.add_argument("--enable_gauss_static_mask",
+                                 help="weighing the loss with gauss mask",
+                                 action="store_true")
+        
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="phantom_all_pose_consistency_long_term")
+                                 default="test_fb_gauss_mask_phantom_all_pose_consistency_long_term")
         
         self.parser.add_argument("--split",
                                  type=str,
@@ -171,7 +176,7 @@ class MonodepthOptions:
         
         self.parser.add_argument("--eval_pose_trajectory",
                                  help="this will evaluate the model performance on trajectory",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--tra_path",
                                  type=str,
@@ -192,7 +197,7 @@ class MonodepthOptions:
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
-                                 default=20)
+                                 default=10)
         
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
@@ -285,7 +290,8 @@ class MonodepthOptions:
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
                                  # default = None, 
-                                 default = '/code/data/Training/processed/data/models/gauss_mask_min_pose_longterm_consistency_0.0001/models/weights_19', 
+                                 default = '/code/data/data/models/phantom_all_gaussian_unet/weights_19',
+                                 # default = '/code/data/Training/processed/data/models/gauss_mask_min_pose_longterm_consistency_0.0001/models/weights_19', 
                                  # default = '/code/data/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19', # use a pretrained network to improve
                                  # default = '/code/data2/models_disc_prior_logging/pose_consistency_working_0.0001/models/weights_19', 
                               #    default  = '/code/data/models_depth_scaled/mdp/models/weights_9',
@@ -298,20 +304,20 @@ class MonodepthOptions:
                                  type=str,
                                  help="models to load",
                                  # default = None)
-                                 default = ["decompose", 'sigma_combined', 'gaussian1'] )
-                                 # default=["pose_encoder", "pose", "depth", "encoder", "decompose", 'sigma_combined', 'gaussian1'])
+                                 # default = ["decompose", 'sigma_combined', 'gaussian1'] )
+                                 default=["pose_encoder", "pose", "depth", "encoder", "decompose", 'sigma_combined', 'gaussian1'])
                               #    default=["position_encoder", "position"])
 
         # LOGGING options
         self.parser.add_argument("--sampling_frequency",
                                  type=int,
                                  help="sampling frequency of the frames, can be [1,2,3,4]",
-                                 default=5)
+                                 default=4)
         
         self.parser.add_argument("--log_frequency",
                                  type=int,
                                  help="number of batches between each tensorboard log",
-                                 default=100)
+                                 default=2000)
         
         self.parser.add_argument("--save_frequency",
                                  type=int,

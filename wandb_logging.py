@@ -154,8 +154,8 @@ class wandb_logging:
                     else:
                         image_list.append(outputs[("disp", s)][:4,:,:]) # first 4 images of the images
                         
-                        if ("color", 1, s) in outputs:
-                            image_list_original.append(outputs[("color", 1, s)][:4,:,:])
+                        if ("color_identity", 1, s) in outputs:
+                            image_list_original.append(outputs[("color_identity", 1, s)][:4,:,:])
                         
                         if ("original_aug", 0, s) in outputs:
                             image_list_original.append(outputs[("original_aug", 0, s)][:4,:,:])

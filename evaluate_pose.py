@@ -15,6 +15,7 @@ from datasets import LungRAWDataset
 from torchvision.utils import save_image
 import matplotlib.pyplot as plt
 import matplotlib
+import glob
 
 matplotlib.use('Agg') # non intercative for showing plots do: matplotlib.use('TkAgg',force=True)
 # matplotlib.use('TkAgg',force=True)
@@ -238,186 +239,233 @@ def evaluate(opt):
     #     os.path.join(os.path.dirname(__file__), "splits", "scared",
     #                  "test_files_phantom14.txt"))[0:50]
     
+    # glob 
+    # glob.glob(os.path.join('splits/endovis', '/*val_phantom_fullLength'))
+    
+    prefixed = [filename for filename in os.listdir('/code/splits/endovis') if filename.startswith("val_phantom_fullLength")]
+    
+    ##SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss
+    folder_names = glob.glob(os.path.join(opt.log_dir, '**/SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/PoseOnly/*'))
+    # opt.frame_ids = [0, 1]  # pose network only takes two frames as input
+    
+    output_names = {}
+    for folder in folder_names:
+        a = folder[-1]
+        if(a >='0'and a <='9'):
+            tokens = folder.split('/')
+            phantom = tokens[4]
+            phantom_seq  = tokens[-1]
+            if not output_names.get(phantom, 0):
+                output_names[phantom] = {}
+            if not output_names[phantom].get(phantom_seq, 0):
+                output_names[phantom][phantom_seq] = folder
+                
     num = 14
-    for traj in range(1,5):
-        filenames_1 = readlines(
-            os.path.join(os.path.dirname(__file__), "splits", "endovis",
-                        "phantom2_fullLength_{}.txt".format(traj)))
-        filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 1)[1:-1]
-        # filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)[1:50]
-        # filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)
-        
-        # filenames = filenames_1
-        # dataset = SCAREDRAWDataset(opt.data_path, filenames, opt.height, opt.width,
-        #                            [0, 1], 4, is_train=False)
-        # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,
-        #                     num_workers=opt.num_workers, pin_memory=True, drop_last=False)
-        
-        dataset = LungRAWDataset(
-                opt.data_path, filenames, opt.height, opt.width,
-                [0, 1, -1], 4, is_train=False, len_ct_depth_data = len(filenames), data_augment = False, sampling_frequency = 1, depth_prior = False, random_frequency = False)
-        
-        dataloader = DataLoader(dataset, 1, shuffle=False, drop_last=False, pin_memory=True)
-        
-        # check time that dataloader takes to load the samples
-        
-        # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,pin_memory=False, drop_last=False)
-        # model_path = opt.load_weights_folder[:-2] + str(traj)
-        # model_path        = opt.load_weights_folder[:-2] + str(traj)
-        model_path = opt.load_weights_folder
-        pose_encoder_path = os.path.join(model_path, "pose_encoder.pth")
-        pose_decoder_path = os.path.join(model_path, "pose.pth")
-
-        pose_encoder = networks.ResnetEncoder(opt.num_layers, False, 2)
-        pose_encoder.load_state_dict(torch.load(pose_encoder_path))
-
-        pose_decoder = networks.PoseDecoder(pose_encoder.num_ch_enc, 1, 2)
-        pose_decoder.load_state_dict(torch.load(pose_decoder_path))
-
-        pose_encoder.cuda()
-        pose_encoder.eval()
-        pose_decoder.cuda()
-        pose_decoder.eval()
-
-        models = {}
-        if opt.gaussian_correction:
-            # load models
-            resize_transform = {}
-            # for s in opt.scales:
-            #     resize_transform[s] = Resize((192// 2 ** s,192// 2 ** s))
-                
-            # gauss_parameters_to_train = []
-            models['decompose'] = networks.UNet(3, 3)
-            
-            models['sigma_combined'] = networks.FCN(output_size = 16) # 4 sigma and mu x 3 for 3 gaussians
-            models['gaussian{}'.format(1)] = networks.GaussianLayer(192)
     
-            models['decompose'].to('cuda')
-            models['sigma_combined'].to('cuda')
-            models['gaussian{}'.format(1)].to('cuda')
-
-            # laod model
-            for n in opt.models_to_load:
-                print("Loading {} weights...".format(n))
-                path = os.path.join(model_path, "{}.pth".format(n))
-                model_dict = models[n].state_dict()
-                pretrained_dict = torch.load(path)
-                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-                model_dict.update(pretrained_dict)
-                models[n].load_state_dict(model_dict)
-
-            # decompose_path = os.path.join(opt.load_weights_folder, "decompose.pth")
-            # sigma_combined_path = os.path.join(opt.load_weights_folder, "sigma_combined.pth")
-            # gaussian1_path = os.path.join(opt.load_weights_folder, "gaussian1.pth")
-            models['decompose'].eval()
-            models['sigma_combined'].eval()
-            models['gaussian{}'.format(1)].eval()
+    for file in prefixed:
+    # for traj in range(1,5):
+        
+        tokens1 = file.split('_')
+        file_phantom    = tokens1[4][:-4]
+        file_seq        = tokens1[3]
+        
+        save_dir = output_names[file_phantom][file_seq]
+        
+        if len(glob.glob(os.path.join(save_dir + "**/*.npz"))) == 0:
             
-        if opt.enable_gauss_mask:
-            # gauss_parameters_to_train = []
-            
-            models['decompose'] = networks.UNet(3, 3)
-            
-            models['sigma_combined'] = networks.FCN(output_size = 16) # 4 sigma and mu x 3 for 3 gaussians
-            models['gaussian{}'.format(1)] = networks.GaussianLayer(192)
-    
-            models['decompose'].to('cuda')
-            models['sigma_combined'].to('cuda')
-            models['gaussian{}'.format(1)].to('cuda')
-
-            # laod model
-            for n in opt.models_to_load:
-                print("Loading {} weights...".format(n))
-                path = os.path.join(model_path, "{}.pth".format(n))
-                model_dict = models[n].state_dict()
-                pretrained_dict = torch.load(path)
-                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-                model_dict.update(pretrained_dict)
-                models[n].load_state_dict(model_dict)
-            
-            models['decompose'].eval()
-            models['sigma_combined'].eval()
-            models['gaussian{}'.format(1)].eval()
-            # load model
-            # get gaussian mask
-            # apply to input
-            # estimate the pose 
-            
-        pred_poses = []
-
-        print("-> Computing pose predictions")
-
-        # opt.frame_ids = [0, 1]  # pose network only takes two frames as input
-
-        count = 0 
-        axisangle_ = []
-        translation_ = []
-        with torch.no_grad():
-            for inputs in dataloader:
+            filenames_1 = readlines(os.path.join(os.path.dirname(__file__), "splits", "endovis",file)) 
+            if not filenames_1:
+                print("no files {}".format(os.path.join(os.path.dirname(__file__), "splits", "endovis",file))) 
                 
-                # count = count + 1
-                # print(count)
-                for key, ipt in inputs.items():
-                    inputs[key] = ipt.cuda()
+            if filenames_1:
+                   
+                filenames   = sample_filenames_frequency(filenames_1, sampling_frequency = 1)[1:-1]
                 
-                frame1 = inputs[("color", 0, 0)]
-                frame2 = inputs[("color", 1, 0)]
+                # filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)[1:50]
+                # filenames = sample_filenames_frequency(filenames_1, sampling_frequency = 3)
                 
-                if opt.enable_gauss_mask:
-                    gauss_mask_combined = []
-                    for frame_id in [0, 1]:
-                        features      = models["decompose"](inputs["color", frame_id, 0]) # no augmentation for validation 
-                        decomposed    = features[1]
-                        
-                        sigma_out_combined        = models['sigma_combined'](features[0]) # will spit out 5, 1 gaussian std 
-                        gaussian_mask1            = models["gaussian1"](sigma_out_combined[:, :4])
-                        gaussian_mask2            = models["gaussian1"](sigma_out_combined[:, 4:8])
-                        gaussian_mask3            = models["gaussian1"](sigma_out_combined[:, 8:12])
-                        gaussian_mask4            = models["gaussian1"](sigma_out_combined[:, 12:16])
-                        
-                        gauss_mask_combined.append(gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
-                    
-                    # mask = torch.cat(gauss_mask_combined, 1).sum(1)/(len(opt.frame_ids)*2) # len(opt.frame_ids)*3
-                    mask, idx = torch.min(torch.cat(gauss_mask_combined, 1), 1, keepdim = True) 
-                    
-                    mask[mask < 0.6] = 0
-                    # mask = mask[:, None, :, :]
-                    mask_t = torch.ones(mask.shape).cuda()
-                    mask_t[mask == 0] = 0
-                    
-                    frame1 = frame1*mask_t
-                    frame2 = frame2*mask_t
-                    
+                # filenames = filenames_1
+                # dataset = SCAREDRAWDataset(opt.data_path, filenames, opt.height, opt.width,
+                #                            [0, 1], 4, is_train=False)
+                # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,
+                #                     num_workers=opt.num_workers, pin_memory=True, drop_last=False)
+                
+                dataset = LungRAWDataset(
+                        opt.data_path, filenames, opt.height, opt.width,
+                        [0, 1, -1], 4, is_train=False, len_ct_depth_data = len(filenames), data_augment = False, sampling_frequency = 1, depth_prior = False, random_frequency = False)
+                
+                dataloader = DataLoader(dataset, 1, shuffle=False, drop_last=False, pin_memory=True)
+                
+                # check time that dataloader takes to load the samples
+                
+                # dataloader = DataLoader(dataset, opt.batch_size, shuffle=False,pin_memory=False, drop_last=False)
+                # model_path = opt.load_weights_folder[:-2] + str(traj)
+                # model_path        = opt.load_weights_folder[:-2] + str(traj)
+                model_path = opt.load_weights_folder
+                pose_encoder_path = os.path.join(model_path, "pose_encoder.pth")
+                pose_decoder_path = os.path.join(model_path, "pose.pth")
+
+                pose_encoder = networks.ResnetEncoder(opt.num_layers, False, 2)
+                pose_encoder.load_state_dict(torch.load(pose_encoder_path))
+
+                pose_decoder = networks.PoseDecoder(pose_encoder.num_ch_enc, 1, 2)
+                pose_decoder.load_state_dict(torch.load(pose_decoder_path))
+
+                pose_encoder.cuda()
+                pose_encoder.eval()
+                pose_decoder.cuda()
+                pose_decoder.eval()
+
+                models = {}
                 if opt.gaussian_correction:
-                    # first pass the inputs through the decompose neteowk
-                    features  = models["decompose"](inputs[("color", 0, 0)]) # no augmentation for validation 
-                    frame1    = features[1]
+                    # load models
+                    resize_transform = {}
+                    # for s in opt.scales:
+                    #     resize_transform[s] = Resize((192// 2 ** s,192// 2 ** s))
+                        
+                    # gauss_parameters_to_train = []
+                    models['decompose'] = networks.UNet(3, 3)
                     
-                    features  = models["decompose"](inputs[("color", 1, 0)]) # no augmentation for validation 
-                    frame2    = features[1]
-                
-                # save_image(frame1, 'gauss_corrected_1.png')
-                # save_image(frame2, 'gauss_corrected_2.png')
-                all_color_aug = torch.cat([frame1, frame2], 1)
+                    models['sigma_combined'] = networks.FCN(output_size = 16) # 4 sigma and mu x 3 for 3 gaussians
+                    models['gaussian{}'.format(1)] = networks.GaussianLayer(192)
+            
+                    models['decompose'].to('cuda')
+                    models['sigma_combined'].to('cuda')
+                    models['gaussian{}'.format(1)].to('cuda')
 
-                features = [pose_encoder(all_color_aug)]
-                axisangle, translation = pose_decoder(features)
-                axisangle_.append(axisangle[:, 0].cpu().numpy())
-                translation_.append(translation[:, 0].cpu().numpy())
+                    # laod model
+                    for n in opt.models_to_load:
+                        print("Loading {} weights...".format(n))
+                        path = os.path.join(model_path, "{}.pth".format(n))
+                        model_dict = models[n].state_dict()
+                        pretrained_dict = torch.load(path)
+                        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+                        model_dict.update(pretrained_dict)
+                        models[n].load_state_dict(model_dict)
 
-                # pred_poses.append(
-                #     transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0]).cpu().numpy())
-                pred_poses.append(
-                    transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0], invert = False).cpu().numpy())
+                    # decompose_path = os.path.join(opt.load_weights_folder, "decompose.pth")
+                    # sigma_combined_path = os.path.join(opt.load_weights_folder, "sigma_combined.pth")
+                    # gaussian1_path = os.path.join(opt.load_weights_folder, "gaussian1.pth")
+                    models['decompose'].eval()
+                    models['sigma_combined'].eval()
+                    models['gaussian{}'.format(1)].eval()
+                    
+                if opt.enable_gauss_mask:
+                    # gauss_parameters_to_train = []
+                    
+                    models['decompose'] = networks.UNet(3, 3)
+                    
+                    models['sigma_combined'] = networks.FCN(output_size = 16) # 4 sigma and mu x 3 for 3 gaussians
+                    models['gaussian{}'.format(1)] = networks.GaussianLayer(192)
+            
+                    models['decompose'].to('cuda')
+                    models['sigma_combined'].to('cuda')
+                    models['gaussian{}'.format(1)].to('cuda')
+
+                    # laod model
+                    for n in opt.models_to_load:
+                        print("Loading {} weights...".format(n))
+                        path = os.path.join(model_path, "{}.pth".format(n))
+                        model_dict = models[n].state_dict()
+                        pretrained_dict = torch.load(path)
+                        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+                        model_dict.update(pretrained_dict)
+                        models[n].load_state_dict(model_dict)
+                    
+                    models['decompose'].eval()
+                    models['sigma_combined'].eval()
+                    models['gaussian{}'.format(1)].eval()
+                    # load model
+                    # get gaussian mask
+                    # apply to input
+                    # estimate the pose 
+                    
+                pred_poses = []
+
+                print("-> Computing pose predictions")
                 
-                # NOTE: the output of the network is in radians 
-                # out = get_transform(axisangle[:, 0], translation[:, 0])
+                # write only if directory is not empty 
+                count = 0 
+                axisangle_ = []
+                translation_ = []
+                with torch.no_grad():
+                    for inputs in dataloader:
+                        
+                        # count = count + 1
+                        # print(count)
+                        for key, ipt in inputs.items():
+                            inputs[key] = ipt.cuda()
+                        
+                        frame1 = inputs[("color", 0, 0)]
+                        frame2 = inputs[("color", 1, 0)]
+                        
+                        if opt.enable_gauss_mask:
+                            gauss_mask_combined = []
+                            for frame_id in [0, 1]:
+                                features      = models["decompose"](inputs["color", frame_id, 0]) # no augmentation for validation 
+                                decomposed    = features[1]
+                                
+                                sigma_out_combined        = models['sigma_combined'](features[0]) # will spit out 5, 1 gaussian std 
+                                gaussian_mask1            = models["gaussian1"](sigma_out_combined[:, :4])
+                                gaussian_mask2            = models["gaussian1"](sigma_out_combined[:, 4:8])
+                                gaussian_mask3            = models["gaussian1"](sigma_out_combined[:, 8:12])
+                                gaussian_mask4            = models["gaussian1"](sigma_out_combined[:, 12:16])
+                                
+                                gauss_mask_combined.append(gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
+                            
+                            # mask = torch.cat(gauss_mask_combined, 1).sum(1)/(len(opt.frame_ids)*2) # len(opt.frame_ids)*3
+                            mask, idx = torch.min(torch.cat(gauss_mask_combined, 1), 1, keepdim = True) 
+                            
+                            mask[mask < 0.6] = 0
+                            # mask = mask[:, None, :, :]
+                            mask_t = torch.ones(mask.shape).cuda()
+                            mask_t[mask == 0] = 0
+                            
+                            frame1 = frame1*mask_t
+                            frame2 = frame2*mask_t
+                            
+                        if opt.gaussian_correction:
+                            # first pass the inputs through the decompose neteowk
+                            features  = models["decompose"](inputs[("color", 0, 0)]) # no augmentation for validation 
+                            frame1    = features[1]
+                            
+                            features  = models["decompose"](inputs[("color", 1, 0)]) # no augmentation for validation 
+                            frame2    = features[1]
+                        
+                        # save_image(frame1, 'gauss_corrected_1.png')
+                        # save_image(frame2, 'gauss_corrected_2.png')
+                        all_color_aug = torch.cat([frame1, frame2], 1)
+
+                        features = [pose_encoder(all_color_aug)]
+                        axisangle, translation = pose_decoder(features)
+                        axisangle_.append(axisangle[:, 0].cpu().numpy())
+                        translation_.append(translation[:, 0].cpu().numpy())
+
+                        # pred_poses.append(
+                        #     transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0]).cpu().numpy())
+                        pred_poses.append(
+                            transformation_from_parameters_euler(axisangle[:, 0], translation[:, 0], invert = False).cpu().numpy())
+                        
+                        # NOTE: the output of the network is in radians 
+                        # out = get_transform(axisangle[:, 0], translation[:, 0])
+                        
                 
-        # if want to save
-        np.savez('pose_prediction_freq_1_001_{}.npz'.format(traj), a = pred_poses)
-        np.savez('eulerangle_freq_1_001_{}.npz'.format(traj), a = axisangle_)
-        np.savez('translation_freq_1_001_{}.npz'.format(traj), a = translation_)
-        
+                save_dir = output_names[file_phantom][file_seq]
+                
+                if not os.path.isfile(os.path.join(save_dir, 'pose_prediction_freq_1.npz')):
+                    np.savez(os.path.join(save_dir, 'pose_prediction_freq_1.npz'), a = pred_poses)
+                else:
+                    print("file exists_{}".format(os.path.isfile(os.path.join(save_dir, 'pose_prediction_freq_1.npz'))))
+                    
+                if not os.path.isfile(os.path.isfile(os.path.join(save_dir,'eulerangle_freq_1_001.npz'))):
+                    np.savez(os.path.join(save_dir,'eulerangle_freq_1_001.npz'), a = axisangle_)
+                else:
+                    print("file exists_{}".format(os.path.isfile(os.path.join(save_dir, 'pose_prediction_freq_1.npz'))))
+                
+                if not os.path.isfile(os.path.join(save_dir,'translation_freq_1_001.npz')):
+                    np.savez(os.path.join(save_dir,'translation_freq_1_001.npz'), a = translation_)
+            else:
+                print('directory_exists {}'.format(save_dir))
         # load the files 
         # b = np.load('axisangle_14.npz')
         # b['a'].shape

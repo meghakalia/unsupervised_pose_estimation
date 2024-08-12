@@ -28,7 +28,7 @@ def main():
     # learning_rate_opt = [5]
     # learning_rate_opt   = np.random.permutation(4) + 4
     
-    learning_rate_opt = [5]
+    learning_rate_opt = [6, 5, 7]
     # fraction_opt        =  np.random.permutation(4)
     # learning_rate_opt = 5
     # for i in range(3, 0, -1):

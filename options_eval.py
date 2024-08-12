@@ -15,13 +15,13 @@ class MonodepthEvalOptions:
                                  type=str,
                                  help="path to the training data",
                               #    default=os.path.join(file_dir, "data"))
-                              default=os.path.join(file_dir, "data2"))
+                              default=os.path.join(file_dir, "data"))
                                    # default=os.path.join(file_dir, "data_porcine"))
         
         self.parser.add_argument("--log_dir",
                                  type=str,
                                  help="log directory",
-                                 default="/code/data/models/models_disc_prior_logging")
+                                 default="/code/data2/Model_Results")
         
         self.parser.add_argument("--write_split_file",
                                  help="if set, will do the train-val split and write in a file",
@@ -80,7 +80,7 @@ class MonodepthEvalOptions:
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--consistency_constraint",
                                  type=float,
@@ -113,19 +113,7 @@ class MonodepthEvalOptions:
                                  help="scales used in the loss",
                                  default=[0, 1, 2, 3])
         
-        self.parser.add_argument("--min_depth",
-                                 type=float,
-                                 help="minimum depth",
-                                 default=0.1)
         
-        self.parser.add_argument("--max_depth",
-                                 type=float,
-                                 help="maximum depth",
-                                 default=150.0)
-        
-        self.parser.add_argument("--use_stereo",
-                                 help="if set, uses stereo pair for training",
-                                 action="store_true")
         
         self.parser.add_argument("--frame_ids",
                                  nargs="+",
@@ -151,10 +139,12 @@ class MonodepthEvalOptions:
                                  type=float,
                                  help="learning rate",
                                  default=1e-6) # initial was 1e-4
+        
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
                                  default=20)
+        
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
                                  help="step size of the scheduler",
@@ -164,28 +154,35 @@ class MonodepthEvalOptions:
         self.parser.add_argument("--v1_multiscale",
                                  help="if set, uses monodepth v1 multiscale",
                                  action="store_true")
+        
         self.parser.add_argument("--avg_reprojection",
                                  help="if set, uses average reprojection loss",
                                  action="store_true")
+        
         self.parser.add_argument("--disable_automasking",
                                  help="if set, doesn't do auto-masking",
                                  action="store_true")
+        
         self.parser.add_argument("--predictive_mask",
                                  help="if set, uses a predictive masking scheme as in Zhou et al",
                                  action="store_true")
+        
         self.parser.add_argument("--no_ssim",
                                  help="if set, disables ssim in the loss",
                                  action="store_true")
+        
         self.parser.add_argument("--weights_init",
                                  type=str,
                                  help="pretrained or scratch",
                                  default="pretrained",
                                  choices=["pretrained", "scratch"])
+        
         self.parser.add_argument("--pose_model_input",
                                  type=str,
                                  help="how many images the pose network gets",
                                  default="pairs",
                                  choices=["pairs", "all"])
+        
         self.parser.add_argument("--pose_model_type",
                                  type=str,
                                  help="normal or shared",
@@ -196,15 +193,18 @@ class MonodepthEvalOptions:
         self.parser.add_argument("--no_cuda",
                                  help="if set disables CUDA",
                                  action="store_true")
+        
         self.parser.add_argument("--num_workers",
                                  type=int,
                                  help="number of dataloader workers",
                                  default=12)
 
         # LOADING options
+      #   /code/data/Training/processed/data/models/no_gauss_mask_phantom_all_pose_consistency_long_term_0.0001/weights_19
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
-                                 default = '/code/data/models_disc_prior_logging/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19',
+                                 default = '/code/data/Training/processed/data/models/no_gauss_mask_phantom_all_pose_consistency_long_term_0.0001/models/weights_19',
+                                 # default = '/code/data/Training/processed/data/models/depth_0_1_phantom_all_pose_consistency_long_term_0.001/weights_19',
                                  # default = '/code/data/models_disc_prior_logging/gradient_gaussian_Mask_pose_prior_0.0001/models/weights_15', # working with this model for pose estimation
                               #    default  = None,C:\Users\banac\Megha\data\vnb\phantom\processed_final\
                                  # default = '/code/code/4_batch_4_multigaussian_gauss_sum_2_singleGaussaNetwork_recon_pretrained_trainable_dataaug_True_gauss_num_1_batchnorm_True_ssim_l1_0.65_sigma_network_gauss_combinationTrue_same_gausskernel_False_separatemeanstd_True/models/weights_23',
@@ -215,6 +215,7 @@ class MonodepthEvalOptions:
                                  # default  = '/code/data/models/mdp/models/weights_9',
                                  # default = None,
                                  help="name of model to load")
+        
         self.parser.add_argument("--models_to_load",
                                  nargs="+",
                                  type=str,
@@ -227,6 +228,7 @@ class MonodepthEvalOptions:
                                  type=int,
                                  help="number of batches between each tensorboard log",
                                  default=100)
+        
         self.parser.add_argument("--save_frequency",
                                  type=int,
                                  help="number of epochs between each save",
@@ -236,38 +238,48 @@ class MonodepthEvalOptions:
         self.parser.add_argument("--eval_stereo",
                                  help="if set evaluates in stereo mode",
                                  action="store_true")
+        
         self.parser.add_argument("--eval_mono",
                                  help="if set evaluates in mono mode",
                                  action="store_true")
+        
         self.parser.add_argument("--disable_median_scaling",
                                  help="if set disables median scaling in evaluation",
                                  action="store_true")
+        
         self.parser.add_argument("--pred_depth_scale_factor",
                                  help="if set multiplies predictions by this number",
                                  type=float,
                                  default=1)
+        
         self.parser.add_argument("--ext_disp_to_eval",
                                  type=str,
                                  help="optional path to a .npy disparities file to evaluate")
+        
         self.parser.add_argument("--eval_split",
                                  type=str,
                                  default="endovis",
                                  choices=[
                                     "eigen", "eigen_benchmark", "benchmark", "odom_9", "odom_10", "endovis"],
                                  help="which split to run eval on")
+        
         self.parser.add_argument("--save_pred_disps",
                                  help="if set saves predicted disparities",
                                  action="store_true")
+        
         self.parser.add_argument("--no_eval",
                                  help="if set disables evaluation",
                                  action="store_true")
+        
         self.parser.add_argument("--eval_eigen_to_benchmark",
                                  help="if set assume we are loading eigen results from npy but "
                                       "we want to evaluate using the new benchmark.",
                                  action="store_true")
+        
         self.parser.add_argument("--eval_out_dir",
                                  help="if set will output the disparities to this folder",
                                  type=str)
+        
         self.parser.add_argument("--post_process",
                                  help="if set will perform the flipping post processing "
                                       "from the original monodepth paper",

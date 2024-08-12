@@ -39,6 +39,7 @@ import wandb_logging
 
 import torchvision.transforms as transforms
 
+
 from evaluate_pose import plotTrajectory, dump_xyz, dump_r, compute_ate, compute_re
 # from torchviz import make_dot
 
@@ -48,6 +49,13 @@ class Trainer:
         self.opt = options
         print('learning rate {} sampling frequency : {}'.format(lr, sampling))
         
+        gauss_static = self.gkern(192)
+        gauss_static[gauss_static < 0.6] = 0
+        gauss_static[gauss_static != 0.0] = 1.0
+        self.gauss_static_mask = gauss_static
+        # img_gauss  = gauss_static([0, 0, 1, 1])
+            
+            
         self.min_mean_trajectory_ates = 1000000
         self.min_mean_trajectory_res = 1000000
         self.min_std_trajectory_ates = 1000000
@@ -70,13 +78,13 @@ class Trainer:
             # self.learning_rate = self.opt.learning_rate
             
             # parameter search 
-            self.frac = frac
+            self.frac               = frac
             self.sampling_frequency = sampling
-            self.learning_rate = lr
-            self.opt.frac = frac
-            self.opt.learning_rate = lr
+            self.learning_rate      = lr
+            self.opt.frac           = frac
+            self.opt.learning_rate  = lr
             self.opt.sampling_frequency = sampling
-            self.wanb_obj = wandb_logging.wandb_logging(self.opt, experiment_name = 'gaussTrain_{}_disc_prior_{}'.format(False, 'patchGAN'))
+        self.wanb_obj               = wandb_logging.wandb_logging(self.opt, experiment_name = 'gaussTrain_{}_disc_prior_{}'.format(False, 'patchGAN'))
 
         self.writeFile(mode = "w")
         # set the manually the hyperparamters you want to optimize using sampling_frequency and learning rate
@@ -174,13 +182,12 @@ class Trainer:
                 self.position_depth[scale] = optical_flow((h, w), self.opt.batch_size, h, w)
                 self.position_depth[scale].to(self.device)
                 
-                
         
-        if self.opt.enable_gauss_mask:
+        self.resize_transform = {}
+        for s in self.opt.scales:
+            self.resize_transform[s] = Resize((192// 2 ** s,192// 2 ** s))
             
-            self.resize_transform = {}
-            for s in self.opt.scales:
-                self.resize_transform[s] = Resize((192// 2 ** s,192// 2 ** s))
+        if self.opt.enable_gauss_mask:
             # self.gauss_parameters_to_train = []
             self.models['decompose'] = networks.UNet(3, 3)
             
@@ -329,9 +336,9 @@ class Trainer:
                 fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_ColonendoSLAMUnity.txt")
             else:
                 # fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "{}_files_phantom_sampling_freq_5.txt")
-                fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "phantom_all_{}.txt")
+                fpath = os.path.join(os.path.dirname(__file__), "splits", self.opt.split, "phantom_all_{}_fw.txt")
         
-        train_filenames = readlines(fpath.format("train")) # exclude frame accordingly
+        train_filenames = readlines(fpath.format("train")) # exclude frame accordingly # change this 
         val_filenames = readlines(fpath.format("val"))
 
         # train_filenames = readlines(fpath.format("train"))[self.sampling_frequency+2:-self.sampling_frequency-6] # exclude frame accordingly
@@ -425,7 +432,37 @@ class Trainer:
             len(train_dataset), len(val_dataset)))
 
         self.save_opts()
-
+        
+    def gaussian_fn(self, M, std, mean):
+        #mean 0 - 1
+    
+        # n = torch.arange(0, M) - (M - 1.0) / 2.0
+        # n = torch.arange(0, M).to('cuda') - mean
+        # sig2 = 2 * std * std
+        # n = n.to('cuda')
+        # sig2.to('cuda')
+        # w = torch.exp(-n ** 2 / (sig2 + 1e-7)).to('cuda')
+        
+        
+        n = torch.arange(0, M) - mean
+        sig2 = 2 * std * std
+        w = torch.exp(-n ** 2 / (sig2 + 1e-7))
+        
+        return w
+    
+    def gkern(self, kernlen=256, stdx=0.5, stdy=0.5, meanx= 0.5, meany= 0.5):
+        """Returns a 2D Gaussian kernel array."""
+        stdx = stdx*kernlen
+        stdy = stdy*kernlen
+        meanx = meanx*kernlen
+        meany = meany*kernlen
+        gkern1d_x = self.gaussian_fn(kernlen, std=stdx, mean = meanx) 
+        gkern1d_y = self.gaussian_fn(kernlen, std=stdy, mean = meany)
+        gkern2d = torch.outer(gkern1d_x, gkern1d_y)
+        gkern2d = gkern2d[None, :, :]
+        gkern2d = gkern2d.expand(3, kernlen, kernlen)
+        return gkern2d
+    
     def set_train_gauss(self):
         self.models['decompose'].train()
         self.models['sigma_combined'].train()
@@ -511,6 +548,7 @@ class Trainer:
             # pass the input1 to the tained unet -> 1- decomposed 2- get sigma -> gaussian 
             # pass this decomposed to depth network. 
             # 
+            
             if self.opt.enable_gauss_mask:
                 gaussian_reponse = {'gaussian_mask1':[], 'original':[]}
                 self.set_eval_gauss()
@@ -535,7 +573,8 @@ class Trainer:
                 mask, idx = torch.min(torch.cat(gauss_mask_combined, 1), 1, keepdim = True) 
                 # mask = torch.cat(gauss_mask_combined, 1).sum(1)/9
                 
-                mask[mask < 0.6] = 0
+                # mask[mask < 0.6] = 0
+                mask[mask < 0.7] = 0
                 
                 gaussian_reponse['gaussian_mask1'].append(mask[:,None, :, :][:4]) 
                 # gaussian_reponse['decomposed'].append(inputs["color_aug", frame_id, 0])
@@ -554,7 +593,21 @@ class Trainer:
                         inputs["color_aug_original", frame_id, s] = inputs["color_aug", frame_id, s]
                         inputs["color_aug", frame_id, s]=inputs["color_aug", frame_id, s]*mask_t # wrong there shouudl be no gradation
                         # save_image(inputs["color_aug", frame_id, s], f'image_{s}_fid_{frame_id}.png')
-                  
+            
+            if self.opt.enable_gauss_static_mask:
+                for s in self.opt.scales:
+                    inputs.update({("gauss_mask", s):self.resize_transform[s](self.gauss_static_mask)})
+                    # mask_t = torch.ones(inputs[("gauss_mask", s)].shape).cuda()
+                    new_mask = inputs[("gauss_mask", s)]
+                    # mask_t[new_mask == 0] = 0
+                    # mask_t[new_mask != 0] = 1
+                    
+                    # multiply inputs with it: 
+                    for frame_id in self.opt.frame_ids:
+                        inputs["color_aug_original", frame_id, s] = inputs["color_aug", frame_id, s]
+                        inputs["color_aug", frame_id, s]=inputs["color_aug", frame_id, s]*new_mask # wrong there shouudl be no gradation
+                
+                
             if self.opt.gaussian_correction: 
                 # self.set_train_gauss()
                 self.set_eval_gauss()
@@ -1143,6 +1196,24 @@ class Trainer:
 
         with torch.no_grad():
             
+            if self.opt.enable_gauss_static_mask:
+                
+                # use a precomputer network. 
+                for key, ipt in inputs.items():
+                    inputs[key] = ipt.to(self.device)
+                    
+                for s in self.opt.scales:
+                    inputs.update({("gauss_mask", s):self.resize_transform[s](self.gauss_static_mask)})
+                    # mask_t = torch.ones(inputs[("gauss_mask", s)].shape).cuda()
+                    new_mask = inputs[("gauss_mask", s)].to(self.device)
+                    # mask_t[new_mask == 0] = 0
+                    # mask_t[new_mask != 0] = 1
+                    
+                    # multiply inputs with it: 
+                    for frame_id in self.opt.frame_ids:
+                        inputs["color_aug_original", frame_id, s] = inputs["color_aug", frame_id, s]
+                        inputs["color_aug", frame_id, s]=inputs["color_aug", frame_id, s]*new_mask # wrong there shouudl be no gradation
+                        
             if self.opt.enable_gauss_mask:
                 gaussian_reponse = None
                 self.set_eval_gauss()
@@ -1165,7 +1236,7 @@ class Trainer:
                     gauss_mask_combined.append(gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
                 
                 mask = torch.cat(gauss_mask_combined, 1).sum(1)/9
-                mask[mask<0.6] = 0
+                mask[mask < 0.7] = 0
                 for s in self.opt.scales:
                     # inputs["color_aug", frame_id, s] = self.resize_transform[s](decomposed)
                     inputs.update({("gauss_mask", s):self.resize_transform[s](mask[:,None, :, :])})
