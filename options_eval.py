@@ -15,7 +15,7 @@ class MonodepthEvalOptions:
                                  type=str,
                                  help="path to the training data",
                               #    default=os.path.join(file_dir, "data"))
-                              default=os.path.join(file_dir, "data"))
+                              default=os.path.join(file_dir, "data2"))
                                    # default=os.path.join(file_dir, "data_porcine"))
         
         self.parser.add_argument("--log_dir",
@@ -31,7 +31,7 @@ class MonodepthEvalOptions:
         self.parser.add_argument("--pre_trained_generator",
                                  type=bool,
                                  help="the name of the folder to save the model in",
-                                 default="store_false")
+                                 default="store_true")
         
         self.parser.add_argument("--model_name",
                                  type=str,
@@ -80,7 +80,7 @@ class MonodepthEvalOptions:
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
-                                 action="store_true")
+                                 action="store_false")
         
         self.parser.add_argument("--consistency_constraint",
                                  type=float,
@@ -194,16 +194,26 @@ class MonodepthEvalOptions:
                                  help="if set disables CUDA",
                                  action="store_true")
         
+        self.parser.add_argument("--flip_backward_images",
+                                 type=bool,
+                                 help="number of dataloader workers",
+                                 default='store_false')
+        
         self.parser.add_argument("--num_workers",
                                  type=int,
                                  help="number of dataloader workers",
                                  default=12)
+        
+        self.parser.add_argument("--gauss_mask_threshold",
+                                 type=float,
+                                 help="number of dataloader workers",
+                                 default=0.7)
 
         # LOADING options
       #   /code/data/Training/processed/data/models/no_gauss_mask_phantom_all_pose_consistency_long_term_0.0001/weights_19
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
-                                 default = '/code/data/Training/processed/data/models/no_gauss_mask_phantom_all_pose_consistency_long_term_0.0001/models/weights_19',
+                                 default = '/code/data/data/models/fb_new_unet_gauss_mask_phantom_all_pose_consistency_long_term_1e-06/models/weights_14',
                                  # default = '/code/data/Training/processed/data/models/depth_0_1_phantom_all_pose_consistency_long_term_0.001/weights_19',
                                  # default = '/code/data/models_disc_prior_logging/gradient_gaussian_Mask_pose_prior_0.0001/models/weights_15', # working with this model for pose estimation
                               #    default  = None,C:\Users\banac\Megha\data\vnb\phantom\processed_final\
@@ -221,7 +231,7 @@ class MonodepthEvalOptions:
                                  type=str,
                                  help="models to load",
                                  default=["decompose", 'sigma_combined', 'gaussian1'])
-                              #    default=["position_encoder", "position"])
+                              #    default=["position_encoder", "position"]) # loaded explicitely in the code
 
         # LOGGING options
         self.parser.add_argument("--log_frequency",

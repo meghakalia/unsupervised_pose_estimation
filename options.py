@@ -79,7 +79,7 @@ class MonodepthOptions:
         self.parser.add_argument("--model_name",
                                  type=str,
                                  help="the name of the folder to save the model in",
-                                 default="test_fb_gauss_mask_phantom_all_pose_consistency_long_term")
+                                 default="fb_new_unet_gauss_mask_phantom_all_pose_consistency_long_term")
         
         self.parser.add_argument("--split",
                                  type=str,
@@ -197,7 +197,7 @@ class MonodepthOptions:
         self.parser.add_argument("--num_epochs",
                                  type=int,
                                  help="number of epochs",
-                                 default=10)
+                                 default=15)
         
         self.parser.add_argument("--scheduler_step_size",
                                  type=int,
@@ -287,9 +287,15 @@ class MonodepthOptions:
                                  action="store_true",
                                  help="true or false")
         
+        self.parser.add_argument("--gauss_mask_threshold",
+                                 type=float,
+                                 help="number of dataloader workers",
+                                 default=0.7)
+        
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
                                  # default = None, 
+                                 # default = '/code/data/data/models/old_phantom_gauss/weights_19',
                                  default = '/code/data/data/models/phantom_all_gaussian_unet/weights_19',
                                  # default = '/code/data/Training/processed/data/models/gauss_mask_min_pose_longterm_consistency_0.0001/models/weights_19', 
                                  # default = '/code/data/gauss_mask_min_pose_longterm_consistency_0.001/models/weights_19', # use a pretrained network to improve
@@ -317,7 +323,7 @@ class MonodepthOptions:
         self.parser.add_argument("--log_frequency",
                                  type=int,
                                  help="number of batches between each tensorboard log",
-                                 default=2000)
+                                 default=500)
         
         self.parser.add_argument("--save_frequency",
                                  type=int,

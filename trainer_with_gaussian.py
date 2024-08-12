@@ -574,7 +574,7 @@ class Trainer:
                 # mask = torch.cat(gauss_mask_combined, 1).sum(1)/9
                 
                 # mask[mask < 0.6] = 0
-                mask[mask < 0.7] = 0
+                mask[mask < self.opt.gauss_mask_threshold] = 0
                 
                 gaussian_reponse['gaussian_mask1'].append(mask[:,None, :, :][:4]) 
                 # gaussian_reponse['decomposed'].append(inputs["color_aug", frame_id, 0])
@@ -1236,7 +1236,8 @@ class Trainer:
                     gauss_mask_combined.append(gaussian_mask1[0]/4 + gaussian_mask2[0]/4 + gaussian_mask3[0]/4 + gaussian_mask4[0]/4)
                 
                 mask = torch.cat(gauss_mask_combined, 1).sum(1)/9
-                mask[mask < 0.7] = 0
+                # mask[mask < 0.6] = 0
+                mask[mask < self.opt.gauss_mask_threshold] = 0
                 for s in self.opt.scales:
                     # inputs["color_aug", frame_id, s] = self.resize_transform[s](decomposed)
                     inputs.update({("gauss_mask", s):self.resize_transform[s](mask[:,None, :, :])})

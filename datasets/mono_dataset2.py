@@ -58,7 +58,8 @@ class MonoDataset(data.Dataset):
                  pose_prior = False, 
                  depth_prior = False, 
                  random_frequency = True, 
-                 pose_fw_color_prior = False
+                 pose_fw_color_prior = False, 
+                 flip_backward = True
                  ):
         super(MonoDataset, self).__init__()
 
@@ -76,6 +77,7 @@ class MonoDataset(data.Dataset):
         self.random_frequency       = random_frequency
         self.pose_fw_color_prior    = pose_fw_color_prior
         self.frame_idxs             = frame_idxs
+        self.flip_backward          = flip_backward
 
         self.is_train = is_train
         self.img_ext = img_ext
@@ -245,7 +247,11 @@ class MonoDataset(data.Dataset):
                     inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
                 elif fw == 'backward':
                      # flipping the frames
-                    inputs[("color", (-1)*i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
+                    if self.flip_backward:
+                        inputs[("color", (-1)*i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
+                    else:
+                        inputs[("color", i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
+                        
                 else:
                     inputs[("color", (-1)*i, -1)] = self.get_color(folder, frame_index + i + i*(curr_sampling_rate - 1), side, do_flip, resize = True)
                     
