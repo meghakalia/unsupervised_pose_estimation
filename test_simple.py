@@ -39,12 +39,17 @@ def parse_args():
                         default = 'output_folderName')
     
     parser.add_argument("--gauss_mask_threshold",
-                                type=float,
-                                help="number of dataloader workers",
-                                default=0.7)
+                            type=float,
+                            help="number of dataloader workers",
+                            default=0.7)
     
     parser.add_argument('--model_path', type=str,
-                        default  = '/code/data2/Models/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/1e-6/models/weights_14'
+                        default = '/code/data2/Models/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/models/weights_25',
+                        # default = '/code/data2/Models/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/finetuned/fb_phantom_all_gaussTrue_pose_consistency_True_long_term_False_pretrained_1e-05/models/weights_8', 
+                        # default = '/code/data2/Models/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/models/weights_16',
+                        # default = '/code/data2/Models/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/finetuned/fb_phantom_all_gaussTrue_pose_consistency_True_long_term_True_1e-05/models/weights_8',
+                        # default = '/code/data2/Models/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/models/weights_9',
+                        # default  = '/code/data2/Models/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/1e-6/models/weights_14'
                         # default = '/code/data/Training/processed/data/models/depth_0_1_phantom_all_pose_consistency_long_term_0.001/weights_19'
                         )
                         # help='path to the test model', default ='/code/data/models_depth_scaled/mdp/models/weights_9') #models_pretrained/Model_MIA")
@@ -67,6 +72,10 @@ def parse_args():
                         help="weighing the loss with gauss mask",
                         action="store_false")
     
+    parser.add_argument("--frame_skip",
+                            type=int,
+                            help="sampling frequency while inference",
+                            default=[4])
     
     parser.add_argument("--enable_uncertainty_estimation",
                         help="creates an unceratinty mask alon with depth images",
@@ -188,7 +197,7 @@ def test_simple(args):
     
     # output folder names
     #SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss
-    folder_names = glob.glob(os.path.join(args.output_dir, '**/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/*'))
+    folder_names = glob.glob(os.path.join(args.output_dir, '**/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/*'))
     # opt.frame_ids = [0, 1]  # pose network only takes two frames as input
     
     output_names = {}
@@ -237,9 +246,13 @@ def test_simple(args):
         if not filenames_1:
             print("no files {}".format(os.path.join(os.path.dirname(__file__), "splits", "endovis",file))) 
             
-        if filenames_1:
+        # if filenames_1:
+        if filenames_1 and filenames_1[0].split('/')[5][:-4] == 'forward' : # and filenames_1[0].split('/')[2] != 'FullPhantom2'
 
-            paths   = sample_filenames_frequency(filenames_1, sampling_frequency = 1)
+            # paths   = sample_filenames_frequency(filenames_1, sampling_frequency = 1)
+            paths   = sample_filenames_frequency(filenames_1, sampling_frequency = args.frame_skip[0])[1:-1]
+            
+            output_directory = output_directory + '/' + 'frequency_{}'.format(args.frame_skip[0])
             
             # remoe first / 
             for i in range(len(paths)):
@@ -305,6 +318,8 @@ def test_simple(args):
                         im = mask_t.squeeze().permute(1, 2, 0).cpu().numpy()
                         im = pil.fromarray(np.uint8(im*255))
                         output_name = os.path.splitext(os.path.basename(image_path))[0]
+                        
+                        # add frequency 
                         name_dest_im = os.path.join(output_directory, "mask_{}.jpeg".format(output_name))
                         im.save(name_dest_im, quality=95)
                     

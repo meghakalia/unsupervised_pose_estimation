@@ -84,6 +84,7 @@ class Trainer:
             self.opt.frac           = frac
             self.opt.learning_rate  = lr
             self.opt.sampling_frequency = sampling
+            self.opt.model_name = self.opt.model_name.format(self.opt.enable_gauss_mask, self.opt.pose_consistency_loss, self.opt.longterm_consistency_loss)
         self.wanb_obj               = wandb_logging.wandb_logging(self.opt, experiment_name = 'gaussTrain_{}_disc_prior_{}'.format(False, 'patchGAN'))
 
         self.writeFile(mode = "w")
@@ -539,7 +540,8 @@ class Trainer:
         d_loss = 0
         num_run = 0 
         for batch_idx, inputs in enumerate(self.train_loader):
-
+            
+            self.set_train()
             num_run+=1
             before_op_time = time.time()
             

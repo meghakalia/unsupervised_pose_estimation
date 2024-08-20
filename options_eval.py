@@ -80,7 +80,7 @@ class MonodepthEvalOptions:
         
         self.parser.add_argument("--enable_gauss_mask",
                                  help="weighing the loss with gauss mask",
-                                 action="store_false")
+                                 action="store_true")
         
         self.parser.add_argument("--consistency_constraint",
                                  type=float,
@@ -138,7 +138,7 @@ class MonodepthEvalOptions:
         self.parser.add_argument("--learning_rate",
                                  type=float,
                                  help="learning rate",
-                                 default=1e-6) # initial was 1e-4
+                                 default=1e-4) # initial was 1e-4
         
         self.parser.add_argument("--num_epochs",
                                  type=int,
@@ -195,14 +195,18 @@ class MonodepthEvalOptions:
                                  action="store_true")
         
         self.parser.add_argument("--flip_backward_images",
-                                 type=bool,
                                  help="number of dataloader workers",
-                                 default='store_false')
+                                 action='store_true')
         
         self.parser.add_argument("--num_workers",
                                  type=int,
                                  help="number of dataloader workers",
                                  default=12)
+        
+        self.parser.add_argument("--frame_skip",
+                                 type=int,
+                                 help="sampling frequency while inference",
+                                 default=[4])
         
         self.parser.add_argument("--gauss_mask_threshold",
                                  type=float,
@@ -213,7 +217,13 @@ class MonodepthEvalOptions:
       #   /code/data/Training/processed/data/models/no_gauss_mask_phantom_all_pose_consistency_long_term_0.0001/weights_19
         self.parser.add_argument("--load_weights_folder",
                                  type=str,
-                                 default = '/code/data/data/models/fb_new_unet_gauss_mask_phantom_all_pose_consistency_long_term_1e-06/models/weights_14',
+                                 default = '/code/data2/Models/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/models/weights_25',
+                                 # default = '/code/data2/Models/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/models/weights_16',
+                                 # default = '/code/data2/Models/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/finetuned/fb_phantom_all_gaussTrue_pose_consistency_True_long_term_False_pretrained_1e-05/models/weights_8',
+                                 # default = '/code/data2/Models/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/finetuned/fb_phantom_all_gaussTrue_pose_consistency_True_long_term_True_1e-05/models/weights_8',
+                                 # default = 'data2/Models/Z_OLD_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/models/weights_19',
+                                 # default = '/code/data2/Models/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/models/weights_9',
+                                 # default = '/code/data/data/models/fb_new_unet_gauss_mask_phantom_all_pose_consistency_long_term_1e-06/models/weights_14',
                                  # default = '/code/data/Training/processed/data/models/depth_0_1_phantom_all_pose_consistency_long_term_0.001/weights_19',
                                  # default = '/code/data/models_disc_prior_logging/gradient_gaussian_Mask_pose_prior_0.0001/models/weights_15', # working with this model for pose estimation
                               #    default  = None,C:\Users\banac\Megha\data\vnb\phantom\processed_final\
@@ -230,7 +240,8 @@ class MonodepthEvalOptions:
                                  nargs="+",
                                  type=str,
                                  help="models to load",
-                                 default=["decompose", 'sigma_combined', 'gaussian1'])
+                                 default = None)
+                                 # default=["decompose", 'sigma_combined', 'gaussian1'])
                               #    default=["position_encoder", "position"]) # loaded explicitely in the code
 
         # LOGGING options
