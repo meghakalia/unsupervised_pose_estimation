@@ -2,15 +2,19 @@
 
 **Self & Semi-Supervised Methods Monocular Depth Estimation in Colonoscopy**
 
-HuggingFace model : https://huggingface.co/spaces/mkalia/DepthPoseEstimation
+*HuggingFace model* : https://huggingface.co/spaces/mkalia/DepthPoseEstimation
 
-<iframe width="560" height="315" src="assets/colonoscopy.mp4" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+https://github.com/user-attachments/assets/885d2582-22e2-4f9a-848d-7adb5b26b191
 
 This code is for non-commercial use; please see the [license file](LICENSE) for terms.
 
 If you find our work useful in your research please consider citing our repo:
 
 ```
+
+
+
+
 @misc{megha_colonoscopy_2024,
   author = {Megha Kalia},
   title = {Self & Semi-Supervised Methods Monocular Depth Estimation in Colonoscopy},
