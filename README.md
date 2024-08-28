@@ -4,10 +4,7 @@
 
 HuggingFace model : https://huggingface.co/spaces/mkalia/DepthPoseEstimation
 
-
-<p align="center">
-  <img src="assets/colonoscopy.mp4" alt="example input output gif" width="600" />
-</p>
+<iframe width="560" height="315" src="assets/colonoscopy.mp4" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 This code is for non-commercial use; please see the [license file](LICENSE) for terms.
 
